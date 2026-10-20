@@ -2,24 +2,53 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
-from .database import engine, Base, get_db, check_and_migrate_db, SessionLocal
-from . import models, schemas
-from .routers import lotes, cabecotes, etapas, dashboard, clientes, auth
-from .routers.etapas import construir_e_salvar_relatorio
-from .routers.auth import obter_usuario_atual, requer_admin, garantir_admin_padrao, gerar_hash_senha
 import os
+import sys
 import base64
 import uuid
 import re
 import json
 
-# Inicializar e Migrar Tabelas no SQLite
-Base.metadata.create_all(bind=engine)
-check_and_migrate_db()
+# Garantir que o pacote 'app' funcione em qualquer Root Directory da Vercel ('./', 'backend' ou 'backend/app')
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_PARENT_DIR = os.path.dirname(_THIS_DIR)
+if _PARENT_DIR not in sys.path:
+    sys.path.insert(0, _PARENT_DIR)
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
 
-# Garantir usuário Administrador padrão na inicialização
-with SessionLocal() as _init_db:
-    garantir_admin_padrao(_init_db)
+try:
+    import app as _app_pkg  # noqa: F401
+except ImportError:
+    import types
+    _app_pkg = types.ModuleType("app")
+    _app_pkg.__path__ = [_THIS_DIR]
+    _app_pkg.__package__ = "app"
+    sys.modules["app"] = _app_pkg
+
+from app.database import engine, Base, get_db, check_and_migrate_db, SessionLocal
+from app import models, schemas
+from app.routers import lotes, cabecotes, etapas, dashboard, clientes, auth
+from app.routers.etapas import construir_e_salvar_relatorio
+from app.routers.auth import obter_usuario_atual, requer_admin, garantir_admin_padrao, gerar_hash_senha
+
+# Inicializar e Migrar Tabelas de forma segura (sem derrubar o cold-start Serverless)
+_DB_INITIALIZED = False
+
+def init_db_safe():
+    global _DB_INITIALIZED
+    if _DB_INITIALIZED:
+        return
+    try:
+        Base.metadata.create_all(bind=engine)
+        check_and_migrate_db()
+        with SessionLocal() as _init_db:
+            garantir_admin_padrao(_init_db)
+        _DB_INITIALIZED = True
+    except Exception as e:
+        print(f"Aviso na inicialização do banco: {e}")
+
+init_db_safe()
 
 app = FastAPI(
     title="Sistema de Controle de Recondicionamento de Cabeçotes (SCRC)",
@@ -54,13 +83,25 @@ app.include_router(cabecotes.router)
 app.include_router(etapas.router)
 app.include_router(dashboard.router)
 
-# Diretórios de Frontend e Uploads
-FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend"))
+# Diretórios de Frontend e Uploads (compatível com Root Directory './', 'backend' ou 'backend/app' na Vercel)
+_CANDIDATE_FRONTENDS = [
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "frontend")),
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend")),
+    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend")),
+]
+FRONTEND_DIR = next((p for p in _CANDIDATE_FRONTENDS if os.path.exists(p)), _CANDIDATE_FRONTENDS[-1])
+
 UPLOADS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
 try:
     os.makedirs(UPLOADS_DIR, exist_ok=True)
 except Exception:
     pass
+
+
+@app.get("/api/health")
+def health_check():
+    init_db_safe()
+    return {"status": "ok", "frontend_dir_exists": os.path.exists(FRONTEND_DIR), "db_initialized": _DB_INITIALIZED}
 
 
 @app.post("/api/upload")

@@ -8,13 +8,19 @@ DEFAULT_SUPABASE_URL = "postgresql://postgres.hmjspzoabaiqtrkswgco:Lidertech%401
 
 RAW_DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_SUPABASE_URL).strip()
 
-# SQLAlchemy 2.0 requer 'postgresql://' em vez de 'postgres://'
+# Normalizar prefixo e escolher driver disponível (psycopg2 ou pg8000 puro Python)
 if RAW_DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = RAW_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 else:
     DATABASE_URL = RAW_DATABASE_URL
 
 IS_SQLITE = DATABASE_URL.startswith("sqlite")
+
+if not IS_SQLITE and DATABASE_URL.startswith("postgresql://"):
+    try:
+        import psycopg2  # noqa: F401
+    except ImportError:
+        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+pg8000://", 1)
 
 if IS_SQLITE:
     engine = create_engine(
@@ -39,6 +45,5 @@ def get_db():
         db.close()
 
 def check_and_migrate_db():
-    """Executa migração automática de colunas para bancos SQLite locais caso utilizado."""
     if not IS_SQLITE:
         return

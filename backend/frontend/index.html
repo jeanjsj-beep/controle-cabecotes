@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCRC - Sistema de Recondicionamento de Cabeçotes</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="dark-theme">
+    <!-- TELA DE LOGIN INTERATIVA E SEGURA -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-bg-glow"></div>
+        <div class="login-card glass">
+            <div class="login-brand">
+                <div class="login-logo-circle">⚙️</div>
+                <h1>SCRC</h1>
+                <p>Sistema de Controle de Recondicionamento de Cabeçotes</p>
+                <div class="security-pill">
+                    <span>🔒 Criptografia PBKDF2-SHA256 &bull; Proteção Anti-Força Bruta</span>
+                </div>
+            </div>
+
+            <form id="login-form" onsubmit="handleLoginSubmit(event)" autocomplete="off" novalidate>
+                <div id="login-error-alert" class="login-alert error hidden"></div>
+
+                <div class="form-group">
+                    <label for="login-username">👤 Usuário de Acesso</label>
+                    <div class="input-icon-wrap">
+                        <input type="text" id="login-username" placeholder="Ex: admin" required minlength="3" maxlength="40" autocomplete="username" oninput="validateLoginInputs()">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="login-password">🔑 Senha de Segurança</label>
+                    <div class="password-input-wrap">
+                        <input type="password" id="login-password" placeholder="Digite sua senha" required autocomplete="current-password" oninput="validateLoginInputs()">
+                        <button type="button" class="toggle-pass-btn" onclick="togglePasswordVisibility('login-password', this)" title="Mostrar/Ocultar Senha">👁️</button>
+                    </div>
+                </div>
+
+                <button type="submit" id="btn-login-submit" class="btn btn-primary login-submit-btn">
+                    <span>🔐 Entrar no Sistema</span>
+                </button>
+            </form>
+
+            <div class="login-footer-info">
+                <small>Acesso monitorado e auditado por usuário e endereço IP.</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container" id="main-app-container" style="display: none;">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-icon">⚙️</span>
+                <div class="brand-text">
+                    <h1>SCRC</h1>
+                    <span>Fluxo de Cabeçotes</span>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" onclick="navigate('dashboard')">
+                    <span class="nav-icon">📊</span> Dashboard Geral
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('entrada')">
+                    <span class="nav-icon">📥</span> 1. Entrada de Lote
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('recebimento')">
+                    <span class="nav-icon">📋</span> Fila & Triagem
+                </a>
+                
+                <div class="nav-section">OFICINA</div>
+                <a href="#" class="nav-item" onclick="navigate('lavagem')">
+                    <span class="nav-icon">🧼</span> Lavagem
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('jateamento')">
+                    <span class="nav-icon">💨</span> Jateamento
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('estanqueidade')">
+                    <span class="nav-icon">💧</span> Estanqueidade
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('faceamento')">
+                    <span class="nav-icon">📐</span> Faceamento
+                </a>
+                <a href="#" class="nav-item" id="nav-lapidacao" onclick="navigate('lapidacao')">
+                    <span class="nav-icon">💎</span> Lapidação
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('montagem')">
+                    <span class="nav-icon">🔧</span> Montagem
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('qualidade')">
+                    <span class="nav-icon">🛡️</span> Qualidade
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('pintura')">
+                    <span class="nav-icon">🎨</span> Pintura
+                </a>
+                
+                <div class="nav-section">SAÍDA & LAUDOS</div>
+                <a href="#" class="nav-item" onclick="navigate('expedicao')">
+                    <span class="nav-icon">🚚</span> Expedição & Saída
+                </a>
+                <a href="#" class="nav-item" onclick="navigate('relatorios')">
+                    <span class="nav-icon">📄</span> Relatórios (PDF)
+                </a>
+
+                <div class="nav-section" id="nav-section-ajustes">AJUSTES & SEGURANÇA</div>
+                <a href="#" class="nav-item" id="nav-usuarios" onclick="navigate('usuarios')">
+                    <span class="nav-icon">👥</span> Usuários & Permissões
+                </a>
+                <a href="#" class="nav-item" id="nav-configuracoes" onclick="navigate('configuracoes')">
+                    <span class="nav-icon">⚙️</span> Configurações
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="server-status">
+                    <span class="status-indicator online"></span>
+                    <span id="sidebar-user-role">Sessão Segura Ativa</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="page-title-wrap">
+                    <h2 id="current-page-title">📊 Dashboard Geral</h2>
+                    <span id="current-page-subtitle">Acompanhamento em tempo real da eficiência do fluxo fabril</span>
+                </div>
+                <div class="user-profile">
+                    <button class="btn btn-secondary btn-sm" id="btn-seed-demo" onclick="seedDatabase()">🔄 Seed Demo Data</button>
+                    <div class="logged-user-card">
+                        <div class="avatar" id="logged-user-avatar">AD</div>
+                        <div class="logged-user-info">
+                            <strong id="logged-user-name">Administrador</strong>
+                            <span id="logged-user-badge" class="badge badge-info" style="font-size:0.68rem; padding:2px 8px;">ADMIN</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="abrirAlterarSenhaModal()" title="Alterar Minha Senha">🔑 Senha</button>
+                    <button class="btn btn-danger btn-sm" onclick="handleLogout()" title="Encerrar Sessão com Segurança">🚪 Sair</button>
+                </div>
+            </header>
+
+            <!-- Screen: Dashboard -->
+            <section id="screen-dashboard" class="screen active">
+                <div class="command-bar glass">
+                    <div class="command-left">
+                        <div class="pulse-indicator">
+                            <span class="pulse-dot"></span>
+                            <span class="pulse-text">CENTRAL OPERACIONAL ATIVA</span>
+                        </div>
+                        <div class="live-clock-badge">
+                            <span>🕒 Hora Fabril:</span>
+                            <strong id="live-clock">--:--:--</strong>
+                        </div>
+                    </div>
+                    
+                    <div class="command-search-wrap">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="global-search-input" class="global-search-input" placeholder="Pesquisar por Lote, Nº de Série, Peça, Cliente ou NF..." oninput="handleGlobalSearch(this.value)">
+                        <div id="search-results-dropdown" class="search-dropdown hidden"></div>
+                    </div>
+
+                    <div class="command-right">
+                        <select id="auto-refresh-select" class="refresh-select" onchange="changeAutoRefresh(this.value)">
+                            <option value="5000">⚡ Refresh: 5s</option>
+                            <option value="15000" selected>🔄 Refresh: 15s</option>
+                            <option value="30000">⏱️ Refresh: 30s</option>
+                            <option value="0">⏸️ Pausar</option>
+                        </select>
+                        <button class="btn btn-secondary btn-sm" onclick="fetchStats()">🔄 Atualizar</button>
+                    </div>
+                </div>
+
+                <div id="dashboard-alerts" class="alert-container"></div>
+
+                <div class="oee-banner glass">
+                    <div class="oee-gauge-card">
+                        <div class="oee-ring-wrap">
+                            <svg class="oee-svg" viewBox="0 0 100 100">
+                                <circle class="oee-circle-bg" cx="50" cy="50" r="40"></circle>
+                                <circle id="oee-circle-progress" class="oee-circle-fill" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="25"></circle>
+                            </svg>
+                            <div class="oee-center-text">
+                                <span id="oee-percentage-val">94.5%</span>
+                                <small>QUALIDADE</small>
+                            </div>
+                        </div>
+                        <div class="oee-info">
+                            <div class="oee-title">Rendimento Fabril Global (OEE)</div>
+                            <div class="oee-sub">Taxa de aprovação dimensional de cabeçotes vs condenações</div>
+                            <div class="oee-badges">
+                                <span class="badge badge-success" id="oee-badge-aprovados">0 Aprovados</span>
+                                <span class="badge badge-danger" id="oee-badge-condenados">0 Condenados</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="oee-gauge-card">
+                        <div class="oee-ring-wrap">
+                            <svg class="oee-svg" viewBox="0 0 100 100">
+                                <circle class="oee-circle-bg" cx="50" cy="50" r="40"></circle>
+                                <circle id="sla-circle-progress" class="oee-circle-fill teal" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="0"></circle>
+                            </svg>
+                            <div class="oee-center-text">
+                                <span id="sla-percentage-val">100%</span>
+                                <small>PONTUALIDADE</small>
+                            </div>
+                        </div>
+                        <div class="oee-info">
+                            <div class="oee-title">Cumprimento de SLA Comercial</div>
+                            <div class="oee-sub">Lotes entregues ou em processo dentro da data limite estipulada</div>
+                            <div class="oee-badges">
+                                <span class="badge badge-teal" id="sla-badge-no-prazo">Lotes no Prazo</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bottleneck-highlight-card" id="bottleneck-main-card">
+                        <div class="bottleneck-card-icon">⚠️</div>
+                        <div class="bottleneck-card-content">
+                            <span class="bottleneck-card-tag">MONITOR DE GARGALOS</span>
+                            <div class="bottleneck-card-title" id="bottleneck-main-title">Gargalo Atual: Faceamento</div>
+                            <div class="bottleneck-card-desc" id="bottleneck-main-desc">Retenção média estimada de 4.5h por peça. Posto sob atenção.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card glass clickable" onclick="navigate('recebimento')">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Lotes em Processo</span>
+                            <span class="kpi-icon blue">🏭</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-lotes-ativos">0</div>
+                        <div class="kpi-footer text-muted" id="kpi-lotes-detalhes">Aguardando dados...</div>
+                    </div>
+
+                    <div class="kpi-card glass clickable" onclick="openSalaModal('FACEAMENTO')">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Cabeçotes em Oficina</span>
+                            <span class="kpi-icon yellow">⚙️</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-cabecotes-ativos">0</div>
+                        <div class="kpi-footer text-muted">Peças unitárias em recondicionamento</div>
+                    </div>
+
+                    <div class="kpi-card glass clickable" onclick="openSalaModal('CONDENADO')">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Peças Condenadas</span>
+                            <span class="kpi-icon red">❌</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-cabecotes-condenados">0</div>
+                        <div class="kpi-footer text-danger" id="kpi-condenados-detalhes">Aguardando reposição de cliente</div>
+                    </div>
+
+                    <div class="kpi-card glass clickable" onclick="navigate('expedicao')">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Ocupação do Almoxarifado</span>
+                            <span class="kpi-icon green">📦</span>
+                        </div>
+                        <div class="kpi-value" id="kpi-espacos-ocupados">0 / 24</div>
+                        <div class="kpi-footer text-muted" id="kpi-espacos-detalhes">Pallets em estocagem final</div>
+                    </div>
+                </div>
+
+                <div class="section-title-wrap">
+                    <h3>🏢 Salas & Postos da Linha de Recondicionamento</h3>
+                    <p class="text-muted">Clique em qualquer sala para abrir o monitoramento completo do posto.</p>
+                </div>
+
+                <div class="rooms-grid" id="rooms-grid-container"></div>
+
+                <div class="dashboard-layout" style="margin-top: 24px;">
+                    <div class="panel glass">
+                        <div class="panel-header">
+                            <div>
+                                <h3>📦 Mini-Mapa do Almoxarifado Final (Pallets ALM-A / ALM-B)</h3>
+                                <span>Visualização da alocação randômica de pallets de saída</span>
+                            </div>
+                            <span class="badge badge-teal" id="pallet-occupancy-badge">0% Ocupado</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="pallet-grid-map" id="pallet-map-container"></div>
+                            <div class="pallet-legend">
+                                <span class="legend-item"><span class="legend-box free"></span> Livre</span>
+                                <span class="legend-item"><span class="legend-box occupied"></span> Ocupado com Lote</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel glass">
+                        <div class="panel-header">
+                            <h3>🤝 Pontualidade de SLA por Cliente</h3>
+                            <span>Acompanhamento de prazo contratual por empresa</span>
+                        </div>
+                        <div class="panel-body">
+                            <div class="table-responsive">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th>Cliente</th>
+                                            <th>Lotes</th>
+                                            <th>No Prazo</th>
+                                            <th>Status SLA</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sla-client-table-body">
+                                        <tr><td colspan="4" class="text-center">Aguardando dados...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel glass" style="margin-top: 24px;">
+                    <div class="panel-header">
+                        <h3>📋 Histórico Vivo de Movimentações Recentes</h3>
+                        <span>Registro de transições efetuadas pelos operadores na linha de produção</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data/Hora</th>
+                                        <th>Lote</th>
+                                        <th>Cabeçote / Série</th>
+                                        <th>Origem ➔ Destino</th>
+                                        <th>Operador</th>
+                                        <th>Descrição</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboard-movements">
+                                    <tr><td colspan="6" class="text-center">Nenhuma movimentação registrada.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Screen: Entrada de Lote (Módulo 1) -->
+            <section id="screen-entrada" class="screen">
+                <div class="form-container glass" style="max-width: 850px;">
+                    <h3>📥 Módulo 1: Entrada e Registro de Lote</h3>
+                    <p class="text-muted">Registre a chegada de um lote de cabeçotes, selecione ou cadastre o cliente e atribua a identificação das peças.</p>
+                    
+                    <form id="form-entrada-lote" onsubmit="submitEntradaLote(event)">
+                        <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border-glass);">
+                            <h4 style="margin-top:0; margin-bottom: 12px; color: var(--accent-light);">🏢 Seleção ou Cadastro de Cliente</h4>
+                            
+                            <div class="form-group">
+                                <label for="entrada-cliente-select">Cliente</label>
+                                <select id="entrada-cliente-select" class="form-control" onchange="toggleNovoClienteForm(this.value)" required>
+                                    <option value="">-- Selecione um Cliente na Lista --</option>
+                                    <option value="NOVO">➕ Registrar Novo Cliente</option>
+                                </select>
+                            </div>
+
+                            <div id="novo-cliente-fields" style="display: none; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 15px; margin-top: 15px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                    <div class="form-group">
+                                        <label for="cli-nome">NOME / RAZÃO SOCIAL *</label>
+                                        <input type="text" id="cli-nome" placeholder="Ex: Retificadora Central EIRELI">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="cli-cnpj">CNPJ</label>
+                                        <input type="text" id="cli-cnpj" placeholder="Ex: 00.000.000/0001-00">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="cli-ie">INSCRIÇÃO ESTADUAL</label>
+                                        <input type="text" id="cli-ie" placeholder="Ex: 123.456.789.100">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="cli-email">E-MAIL</label>
+                                        <input type="email" id="cli-email" placeholder="Ex: contato@cliente.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="cli-telefone">TELEFONE</label>
+                                        <input type="text" id="cli-telefone" placeholder="Ex: (11) 98888-7777">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="cli-data">DATA DE CADASTRO</label>
+                                        <input type="date" id="cli-data">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border-glass);">
+                            <h4 style="margin-top:0; margin-bottom: 12px; color: var(--accent-light);">⚙️ Quantidade e Identificação de Peças</h4>
+                            
+                            <div class="form-group">
+                                <label for="entrada-qtd">Quantidade de Cabeçotes no Lote</label>
+                                <input type="number" id="entrada-qtd" min="1" max="100" value="5" required onchange="gerarCamposIdentificacao(this.value)" onkeyup="gerarCamposIdentificacao(this.value)">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Número de Identificação da Peça (Origem Cliente)</label>
+                                <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 10px;">Informe a identificação de cada cabeçote recebido. O sistema irá gerar um <strong>Número de Série Interno</strong> para cada peça.</p>
+
+                                <div id="campos-identificacao-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; max-height: 350px; overflow-y: auto; padding: 5px;"></div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 1rem;">🚀 Registrar Entrada do Lote</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Screen: Recebimento & Triagem -->
+            <section id="screen-recebimento" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h3>📥 Fila de Recebimento FIFO (Lotes Pendentes)</h3>
+                        <span>Lotes pré-cadastrados aguardando recebimento físico na portaria</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Código Temp</th>
+                                        <th>Cliente</th>
+                                        <th>NF Remessa</th>
+                                        <th>Status</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recebimento-fifo-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel glass" style="margin-top: 24px;">
+                    <div class="panel-header">
+                        <h3>📋 Lotes em Processo na Oficina</h3>
+                        <span>Cabeçotes individuais, rotas configuradas e relatórios técnicos</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>NF Remessa</th>
+                                        <th>Status Lote</th>
+                                        <th>Peças (Concluídas/Total)</th>
+                                        <th>Ficha de Manutenção</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recebidos-lotes-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Confirmar Recebimento -->
+                <div id="modal-recebimento" class="modal">
+                    <div class="modal-content glass">
+                        <div class="modal-header">
+                            <h3>Confirmar Recebimento Físico</h3>
+                            <button class="close-btn" onclick="closeModal('modal-recebimento')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Lote: <strong id="modal-recebimento-lote-cod"></strong> - Cliente: <strong id="modal-recebimento-lote-cli"></strong></p>
+                            <div class="form-group">
+                                <label for="recebimento-seriais">Números de Série dos Cabeçotes (Um por linha)</label>
+                                <textarea id="recebimento-seriais" rows="8" class="form-control" placeholder="SN-1001&#10;SN-1002" required></textarea>
+                            </div>
+                            <button class="btn btn-primary" onclick="confirmarRecebimentoFisico()">Salvar e Gerar Cabeçotes</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Rota Flutuante (Checklist de Desmontagem) -->
+                <div id="modal-checklist" class="modal">
+                    <div class="modal-content glass" style="max-width: 600px;">
+                        <div class="modal-header">
+                            <h3>Configuração de Rota Flutuante & Checklist</h3>
+                            <button class="close-btn" onclick="closeModal('modal-checklist')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <p style="margin-bottom:14px;">Defina o roteiro de manutenção para o cabeçote: <strong id="checklist-cabecote-serial"></strong></p>
+                            <div class="checklist-options">
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="chk-jateamento" checked>
+                                    <label for="chk-jateamento">Requer Jateamento Abrasivo</label>
+                                </div>
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="chk-estanqueidade" checked>
+                                    <label for="chk-estanqueidade">Requer Teste de Estanqueidade (Pressão)</label>
+                                </div>
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="chk-faceamento" checked>
+                                    <label for="chk-faceamento">Requer Faceamento (Medida Inicial e Final)</label>
+                                </div>
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="chk-lapidacao" checked>
+                                    <label for="chk-lapidacao">Requer Lapidação (Teste de Vácuo APR/REP)</label>
+                                </div>
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="chk-montagem" checked>
+                                    <label for="chk-montagem">Requer Montagem (Válvula, Sede, Guia) & Qualidade</label>
+                                </div>
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="chk-pintura" checked>
+                                    <label for="chk-pintura">Requer Pintura Protetora</label>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" style="margin-top: 20px; width: 100%;" onclick="salvarChecklist()">Iniciar Processo na Lavagem ➔</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Ficha Física -->
+                <div id="modal-ficha-fisica" class="modal">
+                    <div class="modal-content glass" style="max-width: 750px; color: #1e293b; background: white;">
+                        <div class="modal-header" style="border-bottom: 2px solid #cbd5e1; padding-bottom: 10px;">
+                            <h3 style="color: #0f172a; margin: 0;">📋 Ficha de Manutenção Física</h3>
+                            <button class="close-btn" style="color: #64748b;" onclick="closeModal('modal-ficha-fisica')">&times;</button>
+                        </div>
+                        <div class="modal-body printable" id="printable-ficha-content"></div>
+                        <div class="modal-footer" style="margin-top: 20px; text-align: right; border-top: 1px solid #cbd5e1; padding-top: 10px;">
+                            <button class="btn btn-secondary" onclick="closeModal('modal-ficha-fisica')">Fechar</button>
+                            <button class="btn btn-primary" onclick="imprimirElemento('modal-ficha-fisica')">🖨️ Imprimir Ficha</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 1. Screen: Lavagem -->
+            <section id="screen-lavagem" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h3>🧼 Posto de Lavagem</h3>
+                        <span>Lavagem química e desengraxante com registro de Foto e Checkbox de confirmação</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº Série</th>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>Etapa Atual</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lavagem-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Registrar Lavagem -->
+                <div id="modal-lavagem" class="modal">
+                    <div class="modal-content glass">
+                        <div class="modal-header">
+                            <h3>🧼 Registrar Lavagem</h3>
+                            <button class="close-btn" onclick="closeModal('modal-lavagem')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>📷 Foto da Lavagem</label>
+                                <input type="file" id="lavagem-file" accept="image/*" capture="environment" onchange="handleSinglePhotoUpload(this, 'lavagem-foto-url', 'lavagem-foto-preview')">
+                                <input type="hidden" id="lavagem-foto-url">
+                                <div id="lavagem-foto-preview" class="photo-preview-box"></div>
+                            </div>
+                            <div class="checkbox-group" style="background: rgba(16, 185, 129, 0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                                <input type="checkbox" id="lavagem-checkbox" checked>
+                                <label for="lavagem-checkbox"><strong>Confirmar Lavagem Concluída (Checkbox Obrigatório)</strong></label>
+                            </div>
+                            <div class="form-group">
+                                <label for="lavagem-operador">Operador Responsável</label>
+                                <input type="text" id="lavagem-operador" required placeholder="Ex: Marcos Silva">
+                            </div>
+                            <button class="btn btn-primary" style="width:100%;" onclick="salvarLavagem()">Concluir Lavagem ➔</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Screen: Jateamento -->
+            <section id="screen-jateamento" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h3>💨 Posto de Jateamento</h3>
+                        <span>Jateamento abrasivo com registro de Foto e Checkbox de confirmação</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº Série</th>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>Etapa Atual</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="jateamento-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Registrar Jateamento -->
+                <div id="modal-jateamento" class="modal">
+                    <div class="modal-content glass">
+                        <div class="modal-header">
+                            <h3>💨 Registrar Jateamento</h3>
+                            <button class="close-btn" onclick="closeModal('modal-jateamento')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>📷 Foto do Jateamento</label>
+                                <input type="file" id="jateamento-file" accept="image/*" capture="environment" onchange="handleSinglePhotoUpload(this, 'jateamento-foto-url', 'jateamento-foto-preview')">
+                                <input type="hidden" id="jateamento-foto-url">
+                                <div id="jateamento-foto-preview" class="photo-preview-box"></div>
+                            </div>
+                            <div class="checkbox-group" style="background: rgba(16, 185, 129, 0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                                <input type="checkbox" id="jateamento-checkbox" checked>
+                                <label for="jateamento-checkbox"><strong>Confirmar Jateamento Concluído (Checkbox Obrigatório)</strong></label>
+                            </div>
+                            <div class="form-group">
+                                <label for="jateamento-operador">Operador Responsável</label>
+                                <input type="text" id="jateamento-operador" required placeholder="Ex: Marcos Silva">
+                            </div>
+                            <button class="btn btn-primary" style="width:100%;" onclick="salvarJateamento()">Concluir Jateamento ➔</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. Screen: Estanqueidade -->
+            <section id="screen-estanqueidade" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h3>💧 Posto de Teste de Estanqueidade</h3>
+                        <span>Verificação de trincas e galerias com Foto, Checkbox e Pressão Aplicada</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº Série</th>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>Etapa Atual</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="estanqueidade-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Registrar Estanqueidade -->
+                <div id="modal-estanqueidade" class="modal">
+                    <div class="modal-content glass">
+                        <div class="modal-header">
+                            <h3>💧 Registrar Estanqueidade</h3>
+                            <button class="close-btn" onclick="closeModal('modal-estanqueidade')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>📷 Foto do Teste de Estanqueidade</label>
+                                <input type="file" id="estanqueidade-file" accept="image/*" capture="environment" onchange="handleSinglePhotoUpload(this, 'estanqueidade-foto-url', 'estanqueidade-foto-preview')">
+                                <input type="hidden" id="estanqueidade-foto-url">
+                                <div id="estanqueidade-foto-preview" class="photo-preview-box"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="estanqueidade-pressao">Pressão Aplicada (bar / PSI) *</label>
+                                <input type="number" step="0.1" id="estanqueidade-pressao" required placeholder="Ex: 5.0">
+                            </div>
+                            <div class="checkbox-group" style="background: rgba(16, 185, 129, 0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                                <input type="checkbox" id="estanqueidade-checkbox" checked>
+                                <label for="estanqueidade-checkbox"><strong>Estanqueidade Aprovada / Sem Vazamentos (Checkbox)</strong></label>
+                            </div>
+                            <div class="form-group">
+                                <label for="estanqueidade-operador">Operador Responsável</label>
+                                <input type="text" id="estanqueidade-operador" required placeholder="Ex: Roberto Dias">
+                            </div>
+                            <button class="btn btn-primary" style="width:100%;" onclick="salvarEstanqueidade()">Concluir Estanqueidade ➔</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. Screen: Faceamento -->
+            <section id="screen-faceamento" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h3>📐 Posto de Faceamento (Retífica)</h3>
+                        <span>Registro de Medida Inicial e Medida Final do cabeçote</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº Série</th>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="faceamento-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Lançar Medições Faceamento -->
+                <div id="modal-faceamento" class="modal">
+                    <div class="modal-content glass" style="max-width: 500px;">
+                        <div class="modal-header">
+                            <h3>📐 Registrar Faceamento</h3>
+                            <button class="close-btn" onclick="closeModal('modal-faceamento')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="face-altura-entrada">Medida Inicial (mm) *</label>
+                                <input type="number" step="0.01" id="face-altura-entrada" required placeholder="Ex: 95.00">
+                            </div>
+                            <div class="form-group">
+                                <label for="face-altura-saida">Medida Final (mm) *</label>
+                                <input type="number" step="0.01" id="face-altura-saida" required placeholder="Ex: 94.80">
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="face-plana" checked>
+                                <label for="face-plana">Planicidade Recuperada?</label>
+                            </div>
+                            <div class="checkbox-group error-checkbox">
+                                <input type="checkbox" id="face-condenado" onchange="toggleCondenadoLabel(this)">
+                                <label for="face-condenado" style="color: #ef4444;">⚠️ Condenar Peça (Fora de medida mínima)</label>
+                            </div>
+                            <div class="form-group">
+                                <label for="face-operador">Operador Responsável</label>
+                                <input type="text" id="face-operador" required placeholder="Ex: Jose Santos">
+                            </div>
+                            <button class="btn btn-primary" style="width:100%;" onclick="salvarFaceamento()">Salvar Faceamento ➔</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. Screen: Lapidação -->
+            <section id="screen-lapidacao" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h3>💎 Posto de Lapidação & Teste de Vácuo</h3>
+                        <span>Confirmação do Vácuo (APR / REP) — Se Reprovado: 1º Trocar Válvula e Testar | 2º Reprovou: Trocar Sede</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº Série</th>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>Status do Vácuo / Retrabalho</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lapidacao-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Registrar Lapidação -->
+                <div id="modal-lapidacao" class="modal">
+                    <div class="modal-content glass" style="max-width: 560px;">
+                        <div class="modal-header">
+                            <h3>💎 Lapidação — Confirmação do Vácuo</h3>
+                            <button class="close-btn" onclick="closeModal('modal-lapidacao')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="lapidacao-retrabalho-banner" style="display: none; margin-bottom: 16px;"></div>
+
+                            <div class="form-group">
+                                <label>Resultado da Confirmação do Vácuo *</label>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px;">
+                                    <label class="vacuo-option apr" id="label-vacuo-apr" onclick="selecionarVacuoOption('APR')">
+                                        <input type="radio" name="lap-vacuo-radio" value="APR" checked>
+                                        <span>✅ APR (Aprovado)</span>
+                                    </label>
+                                    <label class="vacuo-option rep" id="label-vacuo-rep" onclick="selecionarVacuoOption('REP')">
+                                        <input type="radio" name="lap-vacuo-radio" value="REP">
+                                        <span>❌ REP (Reprovado)</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div style="background: rgba(255,255,255,0.03); padding: 14px; border-radius: 8px; border: 1px solid var(--border-glass); margin-bottom: 18px;">
+                                <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 10px;">
+                                    🔧 Registro de Retrabalho (Quando houver reprovação no vácuo):
+                                </label>
+                                <div class="checkbox-group" style="margin-bottom: 10px;">
+                                    <input type="checkbox" id="lap-trocou-valvula">
+                                    <label for="lap-trocou-valvula">1ª Etapa de Retrabalho: <strong>Trocou Válvula</strong> para novo teste</label>
+                                </div>
+                                <div class="checkbox-group" style="margin-bottom: 0;">
+                                    <input type="checkbox" id="lap-trocou-sede">
+                                    <label for="lap-trocou-sede">2ª Etapa de Retrabalho (Reprovou após válvula): <strong>Trocou Sede</strong></label>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="lap-operador">Operador Responsável</label>
+                                <input type="text" id="lap-operador" required placeholder="Ex: Carlos Lima">
+                            </div>
+                            <button class="btn btn-primary" style="width:100%;" onclick="salvarLapidacao()">Registrar Teste de Vácuo ➔</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. Screen: Montagem -->
+            <section id="screen-montagem" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h3>🔧 Posto de Montagem</h3>
+                        <span>Checklist de montagem de Válvula (Exaustão/Admissão), Sede (Exaustão/Admissão) e Guia</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº Série</th>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="montagem-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Registrar Montagem -->
+                <div id="modal-montagem" class="modal">
+                    <div class="modal-content glass" style="max-width: 540px;">
+                        <div class="modal-header">
+                            <h3>🔧 Registrar Montagem de Componentes</h3>
+                            <button class="close-btn" onclick="closeModal('modal-montagem')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <!-- Válvula -->
+                            <div class="montagem-group-card">
+                                <div class="montagem-group-title">🔩 Válvula</div>
+                                <div class="montagem-check-row">
+                                    <div class="checkbox-group" style="margin-bottom:0;">
+                                        <input type="checkbox" id="mont-valvula-exaustao" checked>
+                                        <label for="mont-valvula-exaustao">Exaustão</label>
+                                    </div>
+                                    <div class="checkbox-group" style="margin-bottom:0;">
+                                        <input type="checkbox" id="mont-valvula-admissao" checked>
+                                        <label for="mont-valvula-admissao">Admissão</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Sede -->
+                            <div class="montagem-group-card">
+                                <div class="montagem-group-title">⭕ Sede</div>
+                                <div class="montagem-check-row">
+                                    <div class="checkbox-group" style="margin-bottom:0;">
+                                        <input type="checkbox" id="mont-sede-exaustao" checked>
+                                        <label for="mont-sede-exaustao">Exaustão</label>
+                                    </div>
+                                    <div class="checkbox-group" style="margin-bottom:0;">
+                                        <input type="checkbox" id="mont-sede-admissao" checked>
+                                        <label for="mont-sede-admissao">Admissão</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Guia -->
+                            <div class="montagem-group-card">
+                                <div class="montagem-group-title">📏 Guia</div>
+                                <div class="montagem-check-row">
+                                    <div class="checkbox-group" style="margin-bottom:0;">
+                                        <input type="checkbox" id="mont-guia-exaustao" checked>
+                                        <label for="mont-guia-exaustao">Exaustão</label>
+                                    </div>
+                                    <div class="checkbox-group" style="margin-bottom:0;">
+                                        <input type="checkbox" id="mont-guia-admissao" checked>
+                                        <label for="mont-guia-admissao">Admissão</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-top: 16px;">
+                                <label for="montagem-operador">Operador Responsável</label>
+                                <input type="text" id="montagem-operador" required placeholder="Ex: Julio Ribeiro">
+                            </div>
+                            <button class="btn btn-primary" style="width:100%;" onclick="salvarMontagem()">Concluir Montagem ➔</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 7. Screen: Controle de Qualidade -->
+            <section id="screen-qualidade" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h3>🛡️ Inspeção de Qualidade & Geração de Relatório Individual</h3>
+                        <span>Anexo de fotos da qualidade e salvamento automático do Relatório Técnico Individual no banco de dados</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº Série</th>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="qualidade-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Registrar Qualidade -->
+                <div id="modal-qualidade" class="modal">
+                    <div class="modal-content glass" style="max-width: 580px;">
+                        <div class="modal-header">
+                            <h3>🛡️ Controle de Qualidade & Relatório</h3>
+                            <button class="close-btn" onclick="closeModal('modal-qualidade')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>📷 Fotos da Qualidade (Pode selecionar uma ou mais fotos)</label>
+                                <input type="file" id="qual-files" accept="image/*" multiple capture="environment" onchange="handleMultiplePhotosUpload(this, 'qual-fotos-preview')">
+                                <div id="qual-fotos-preview" class="photo-preview-grid"></div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="qual-obs">Observações Técnicas do Relatório</label>
+                                <textarea id="qual-obs" rows="2" placeholder="Ex: Medições, estanqueidade, vácuo e montagem inspecionados e aprovados."></textarea>
+                            </div>
+
+                            <div class="checkbox-group" style="background: rgba(16, 185, 129, 0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                                <input type="checkbox" id="qual-aprovado" checked>
+                                <label for="qual-aprovado"><strong>Aprovar Cabeçote na Qualidade</strong></label>
+                            </div>
+
+                            <div class="checkbox-group" style="background: rgba(56, 189, 248, 0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.25);">
+                                <input type="checkbox" id="qual-gerar-relatorio" checked>
+                                <label for="qual-gerar-relatorio"><strong>📄 Gerar e Salvar Relatório Individual no Banco (Disponível p/ PDF)</strong></label>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="qual-tecnico">Técnico de Qualidade Responsável *</label>
+                                <input type="text" id="qual-tecnico" required placeholder="Ex: Pedro Almeida">
+                            </div>
+                            <button class="btn btn-primary" style="width:100%;" onclick="salvarQualidade()">Salvar Qualidade & Emitir Relatório ➔</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 8. Screen: Pintura -->
+            <section id="screen-pintura" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h3>🎨 Posto de Pintura</h3>
+                        <span>Registro fotográfico da pintura final — Ao concluir, a peça segue direto para Expedição</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº Série</th>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>Relatório</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pintura-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Registrar Pintura -->
+                <div id="modal-pintura" class="modal">
+                    <div class="modal-content glass" style="max-width: 520px;">
+                        <div class="modal-header">
+                            <h3>🎨 Registrar Pintura</h3>
+                            <button class="close-btn" onclick="closeModal('modal-pintura')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>📷 Foto da Pintura</label>
+                                <input type="file" id="pintura-file" accept="image/*" capture="environment" onchange="handleSinglePhotoUpload(this, 'pint-foto', 'pintura-foto-preview')">
+                                <input type="hidden" id="pint-foto">
+                                <div id="pintura-foto-preview" class="photo-preview-box"></div>
+                            </div>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="pint-passa" checked>
+                                <label for="pint-passa">Acabamento de Pintura Aprovado?</label>
+                            </div>
+                            <div class="form-group">
+                                <label for="pint-operador">Operador Responsável</label>
+                                <input type="text" id="pint-operador" required placeholder="Ex: Carlos Lima">
+                            </div>
+                            <button class="btn btn-primary" style="width:100%;" onclick="salvarPintura()">Concluir Pintura & Liberar p/ Expedição ➔</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 9. Screen: Expedição & Almoxarifado -->
+            <section id="screen-expedicao" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header">
+                        <h3>🚚 Expedição de Lotes Finalizados</h3>
+                        <span>Registro de Foto, Número da Nota Fiscal, Veículo e Motorista</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>NF Remessa</th>
+                                        <th>Peças / Relatórios</th>
+                                        <th>Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expedicao-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel glass" style="margin-top: 24px;">
+                    <div class="panel-header">
+                        <h3>✅ Histórico de Lotes Expedidos</h3>
+                        <span>Lotes despachados com Nota Fiscal, Veículo, Motorista e Foto</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>Nº da Nota (Saída)</th>
+                                        <th>Veículo</th>
+                                        <th>Motorista</th>
+                                        <th>Foto</th>
+                                        <th>Relatórios das Peças</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expedidos-history-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel glass" style="margin-top: 24px;">
+                    <div class="panel-header">
+                        <h3>🏭 Mapa do Almoxarifado de Saída</h3>
+                        <span>Posições de pallets no estoque</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="warehouse-grid" id="warehouse-slots-container"></div>
+                    </div>
+                </div>
+
+                <!-- Modal: Registrar Saída / Expedição -->
+                <div id="modal-expedicao" class="modal">
+                    <div class="modal-content glass" style="max-width: 540px;">
+                        <div class="modal-header">
+                            <h3>🚚 Registrar Expedição do Lote</h3>
+                            <button class="close-btn" onclick="closeModal('modal-expedicao')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <p style="margin-bottom: 14px;">Lote: <strong id="modal-expedicao-lote-cod"></strong> — Cliente: <strong id="modal-expedicao-lote-cli"></strong></p>
+
+                            <div class="form-group">
+                                <label>📷 Foto da Expedição / Carregamento</label>
+                                <input type="file" id="exp-file" accept="image/*" capture="environment" onchange="handleSinglePhotoUpload(this, 'exp-foto-url', 'exp-foto-preview')">
+                                <input type="hidden" id="exp-foto-url">
+                                <div id="exp-foto-preview" class="photo-preview-box"></div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="exp-nf-retorno">Número da Nota Fiscal *</label>
+                                <input type="text" id="exp-nf-retorno" required placeholder="Ex: NF-77382">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="exp-veiculo">Veículo (Placa / Modelo) *</label>
+                                <input type="text" id="exp-veiculo" required placeholder="Ex: Caminhão VW 24.280 - Placa ABC-1D23">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="exp-motorista">Motorista *</label>
+                                <input type="text" id="exp-motorista" required placeholder="Ex: João Ferreira">
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                <div class="form-group">
+                                    <label for="exp-horario">Horário de Saída</label>
+                                    <input type="time" id="exp-horario" required value="16:00">
+                                </div>
+                                <div class="form-group">
+                                    <label for="exp-pallet">Pallet Almoxarifado</label>
+                                    <select id="exp-pallet" class="form-control"></select>
+                                </div>
+                            </div>
+
+                            <button class="btn btn-primary" style="width:100%;" onclick="salvarExpedicao()">Confirmar Expedição ➔</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 10. Screen: Central de Relatórios Individuais (PDF) -->
+            <section id="screen-relatorios" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <h3>📄 Central de Relatórios Técnicos Individuais (PDF)</h3>
+                            <span>Relatórios salvos individualmente no banco de dados de cada cabeçote — disponíveis para visualização, download e impressão PDF a qualquer momento</span>
+                        </div>
+                        <input type="text" id="relatorios-search" class="form-control" style="max-width: 300px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-glass); color: white; padding: 8px 12px; border-radius: 8px;" placeholder="Filtrar por série, cliente ou lote..." oninput="filtrarTabelaRelatorios(this.value)">
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº de Série</th>
+                                        <th>Identificação Peça</th>
+                                        <th>Lote</th>
+                                        <th>Cliente</th>
+                                        <th>Etapa Atual</th>
+                                        <th>Status Relatório</th>
+                                        <th>Ação (PDF / Impressão)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="relatorios-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Screen: Gestão de Usuários e Permissões (Exclusivo Admin) -->
+            <section id="screen-usuarios" class="screen">
+                <div class="panel glass">
+                    <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <h3>👥 Gestão de Usuários e Controle de Permissões (RBAC)</h3>
+                            <span>Cadastre operadores, defina permissões granulares por módulo/etapa e monitore a segurança das contas</span>
+                        </div>
+                        <button class="btn btn-primary" onclick="abrirModalUsuario()">➕ Novo Usuário</button>
+                    </div>
+                    <div class="panel-body">
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Login</th>
+                                        <th>Nome Completo / Cargo</th>
+                                        <th>Perfil</th>
+                                        <th>Permissões de Acesso</th>
+                                        <th>Status / Segurança</th>
+                                        <th>Último Acesso</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usuarios-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal: Criar / Editar Usuário e Permissões -->
+                <div id="modal-usuario" class="modal">
+                    <div class="modal-content glass" style="max-width: 680px; width: 95%;">
+                        <div class="modal-header">
+                            <h3 id="modal-usuario-title">➕ Cadastrar Novo Usuário</h3>
+                            <button class="close-btn" onclick="closeModal('modal-usuario')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="form-usuario" onsubmit="salvarUsuarioSubmit(event)" autocomplete="off">
+                                <input type="hidden" id="usr-id">
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                                    <div class="form-group">
+                                        <label for="usr-username">Login de Acesso *</label>
+                                        <input type="text" id="usr-username" required placeholder="Ex: joao.retifica" pattern="[a-zA-Z0-9._-]{3,40}">
+                                        <small class="text-muted" style="font-size:0.72rem;">Apenas letras, números, ponto, hífen ou _</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="usr-nome">Nome Completo *</label>
+                                        <input type="text" id="usr-nome" required placeholder="Ex: João Carlos Silva">
+                                    </div>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                                    <div class="form-group">
+                                        <label for="usr-cargo">Cargo / Função</label>
+                                        <input type="text" id="usr-cargo" placeholder="Ex: Operador de Retífica" value="Operador">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="usr-password" id="label-usr-password">Senha de Acesso *</label>
+                                        <div class="password-input-wrap">
+                                            <input type="password" id="usr-password" placeholder="Mínimo 8 caracteres fortes" oninput="avaliarForcaSenha(this.value, 'usr-pass-meter')">
+                                            <button type="button" class="toggle-pass-btn" onclick="togglePasswordVisibility('usr-password', this)">👁️</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Medidor Interativo de Força da Senha -->
+                                <div id="usr-pass-meter" class="password-strength-box">
+                                    <div class="strength-bar-wrap">
+                                        <div class="strength-bar-fill" id="usr-pass-bar"></div>
+                                    </div>
+                                    <div class="strength-rules">
+                                        <span id="rule-len" class="rule-item">8+ caract.</span>
+                                        <span id="rule-upper" class="rule-item">Maiúscula (A-Z)</span>
+                                        <span id="rule-lower" class="rule-item">Minúscula (a-z)</span>
+                                        <span id="rule-num" class="rule-item">Número (0-9)</span>
+                                        <span id="rule-spec" class="rule-item">Especial (@#$)</span>
+                                    </div>
+                                </div>
+
+                                <div style="display: flex; gap: 24px; margin: 14px 0; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border-glass);">
+                                    <div class="checkbox-group" style="margin-bottom:0;">
+                                        <input type="checkbox" id="usr-is-admin" onchange="toggleAdminPermissionsBox(this.checked)">
+                                        <label for="usr-is-admin"><strong>👑 Administrador do Sistema (Acesso Total)</strong></label>
+                                    </div>
+                                    <div class="checkbox-group" style="margin-bottom:0;">
+                                        <input type="checkbox" id="usr-ativo" checked>
+                                        <label for="usr-ativo"><strong>✅ Conta Ativa</strong></label>
+                                    </div>
+                                </div>
+
+                                <!-- Matriz de Permissões para Usuários Comuns -->
+                                <div id="usr-permissoes-section" class="permissoes-panel">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                                        <label style="font-weight:700; font-size:0.88rem; color:var(--primary);">🛡️ Permissões de Módulos e Etapas (Usuário Comum)</label>
+                                        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                                            <button type="button" class="btn btn-secondary btn-sm" onclick="selecionarPresetPermissoes('todos')">Marcar Todos</button>
+                                            <button type="button" class="btn btn-secondary btn-sm" onclick="selecionarPresetPermissoes('oficina')">Só Oficina</button>
+                                            <button type="button" class="btn btn-secondary btn-sm" onclick="selecionarPresetPermissoes('qualidade_exp')">Qualidade & Expedição</button>
+                                            <button type="button" class="btn btn-secondary btn-sm" onclick="selecionarPresetPermissoes('nenhum')">Limpar</button>
+                                        </div>
+                                    </div>
+
+                                    <div class="permissoes-grid" id="usr-permissoes-grid">
+                                        <!-- Checkboxes de permissões gerados via JS -->
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary" style="width:100%; margin-top:16px;">💾 Salvar Usuário e Permissões</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Screen: Configurações -->
+            <section id="screen-configuracoes" class="screen">
+                <div class="panel glass" style="max-width: 600px;">
+                    <div class="panel-header">
+                        <h3>⚙️ Configurações de Recursos do Sistema</h3>
+                        <span>Ative ou desative módulos adicionais de forma flexível</span>
+                    </div>
+                    <div class="panel-body">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="config-lapidacao-toggle" onchange="toggleLapidacaoModule(this.checked)">
+                            <label for="config-lapidacao-toggle">
+                                <strong>💎 Habilitar Módulo de Lapidação</strong>
+                                <p class="text-muted" style="margin: 4px 0 0 0; font-size: 0.85rem;">Se ativado, cabeçotes com checklist de lapidação passarão pelo teste de vácuo e controle de troca de válvula/sede.</p>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL DETALHADO DE SALA/POSTO -->
+    <div id="modal-detalhes-sala" class="modal">
+        <div class="modal-content glass" style="max-width: 950px; width: 92%;">
+            <div class="modal-header">
+                <div>
+                    <h3 id="modal-sala-title">🏢 Monitoramento da Sala</h3>
+                    <span id="modal-sala-subtitle" class="text-muted">Acompanhamento completo de todas as peças presentes no posto</span>
+                </div>
+                <button class="close-btn" onclick="closeModal('modal-detalhes-sala')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="sala-modal-summary-bar">
+                    <div class="summary-item">
+                        <span>Total de Cabeçotes na Sala:</span>
+                        <strong id="modal-sala-count">0</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Status Operacional:</span>
+                        <span class="badge badge-success" id="modal-sala-status-badge">Normal</span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Ação Recomendada:</span>
+                        <button class="btn btn-secondary btn-sm" id="modal-sala-action-btn" onclick="navigateFromSalaModal()">Navegar para este Posto ➔</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="margin-top: 16px; max-height: 400px; overflow-y: auto;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nº de Série</th>
+                                <th>Identificação Peça</th>
+                                <th>Lote</th>
+                                <th>Cliente</th>
+                                <th>Parâmetros / Checklist</th>
+                                <th>Relatório Individual</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-sala-table-body">
+                            <tr><td colspan="6" class="text-center">Carregando peças da sala...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: RELATÓRIO TÉCNICO INDIVIDUAL DO CABEÇOTE (PARA DOWNLOAD / IMPRESSÃO PDF) -->
+    <div id="modal-relatorio-individual" class="modal">
+        <div class="modal-content glass" style="max-width: 880px; width: 95%; color: #0f172a; background: #ffffff;">
+            <div class="modal-header no-print" style="border-bottom: 2px solid #cbd5e1; padding-bottom: 12px;">
+                <h3 style="color: #0f172a; margin: 0;">📄 Relatório Técnico Individual do Cabeçote</h3>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <button class="btn btn-primary" onclick="imprimirElemento('modal-relatorio-individual')">🖨️ Baixar PDF / Imprimir</button>
+                    <button class="close-btn" style="color: #64748b;" onclick="closeModal('modal-relatorio-individual')">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body printable" id="printable-relatorio-individual-content">
+                <!-- Preenchido dinamicamente com dados e fotos do banco -->
+            </div>
+            <div class="modal-footer no-print" style="margin-top: 20px; text-align: right; border-top: 1px solid #cbd5e1; padding-top: 12px;">
+                <button class="btn btn-secondary" style="color:#0f172a; border-color:#94a3b8;" onclick="closeModal('modal-relatorio-individual')">Fechar</button>
+                <button class="btn btn-primary" onclick="imprimirElemento('modal-relatorio-individual')">🖨️ Salvar como PDF / Imprimir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ALTERAR PRÓPRIA SENHA -->
+    <div id="modal-alterar-senha" class="modal">
+        <div class="modal-content glass" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3>🔑 Alterar Minha Senha</h3>
+                <button class="close-btn" onclick="closeModal('modal-alterar-senha')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="form-alterar-senha" onsubmit="salvarAlteracaoSenha(event)">
+                    <div class="form-group">
+                        <label for="alt-senha-atual">Senha Atual *</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="alt-senha-atual" required placeholder="Digite sua senha atual">
+                            <button type="button" class="toggle-pass-btn" onclick="togglePasswordVisibility('alt-senha-atual', this)">👁️</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="alt-nova-senha">Nova Senha Forte *</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="alt-nova-senha" required placeholder="Mínimo 8 caracteres" oninput="avaliarForcaSenha(this.value, 'alt-pass-meter')">
+                            <button type="button" class="toggle-pass-btn" onclick="togglePasswordVisibility('alt-nova-senha', this)">👁️</button>
+                        </div>
+                    </div>
+                    <div id="alt-pass-meter" class="password-strength-box" style="margin-bottom: 16px;">
+                        <div class="strength-bar-wrap">
+                            <div class="strength-bar-fill"></div>
+                        </div>
+                        <div class="strength-rules">
+                            <span class="rule-item" data-rule="len">8+ caract.</span>
+                            <span class="rule-item" data-rule="upper">Maiúscula</span>
+                            <span class="rule-item" data-rule="lower">Minúscula</span>
+                            <span class="rule-item" data-rule="num">Número</span>
+                            <span class="rule-item" data-rule="spec">Especial</span>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%;">🔐 Atualizar Senha</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-wrap" class="toast-wrap"></div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
