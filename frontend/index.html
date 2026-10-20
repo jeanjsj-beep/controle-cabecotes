@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>SCRC - Sistema de Recondicionamento de Cabeçotes</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/style.css?v=6.0">
+    <link rel="stylesheet" href="/style.css?v=7.0">
 </head>
 <body class="dark-theme">
     <!-- TELA DE LOGIN INTERATIVA E SEGURA -->
@@ -381,23 +381,23 @@
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                                     <div class="form-group">
                                         <label for="cli-nome">NOME / RAZÃO SOCIAL *</label>
-                                        <input type="text" id="cli-nome" placeholder="Ex: Retificadora Central EIRELI">
+                                        <input type="text" id="cli-nome" maxlength="120" placeholder="Ex: Retificadora Central EIRELI">
                                     </div>
                                     <div class="form-group">
                                         <label for="cli-cnpj">CNPJ</label>
-                                        <input type="text" id="cli-cnpj" placeholder="Ex: 00.000.000/0001-00">
+                                        <input type="text" id="cli-cnpj" maxlength="20" placeholder="Ex: 00.000.000/0001-00">
                                     </div>
                                     <div class="form-group">
                                         <label for="cli-ie">INSCRIÇÃO ESTADUAL</label>
-                                        <input type="text" id="cli-ie" placeholder="Ex: 123.456.789.100">
+                                        <input type="text" id="cli-ie" maxlength="20" placeholder="Ex: 123.456.789.100">
                                     </div>
                                     <div class="form-group">
                                         <label for="cli-email">E-MAIL</label>
-                                        <input type="email" id="cli-email" placeholder="Ex: contato@cliente.com">
+                                        <input type="email" id="cli-email" maxlength="120" placeholder="Ex: contato@cliente.com">
                                     </div>
                                     <div class="form-group">
                                         <label for="cli-telefone">TELEFONE</label>
-                                        <input type="text" id="cli-telefone" placeholder="Ex: (11) 98888-7777">
+                                        <input type="text" id="cli-telefone" maxlength="30" placeholder="Ex: (11) 98888-7777">
                                     </div>
                                     <div class="form-group">
                                         <label for="cli-data">DATA DE CADASTRO</label>
@@ -412,7 +412,7 @@
                             
                             <div class="form-group">
                                 <label for="entrada-qtd">Quantidade de Cabeçotes no Lote</label>
-                                <input type="number" id="entrada-qtd" min="1" max="100" value="5" required onchange="gerarCamposIdentificacao(this.value)" onkeyup="gerarCamposIdentificacao(this.value)">
+                                <input type="number" id="entrada-qtd" min="1" max="200" value="5" required onchange="gerarCamposIdentificacao(this.value)" onkeyup="gerarCamposIdentificacao(this.value)">
                             </div>
 
                             <div class="form-group">
@@ -596,7 +596,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="lavagem-operador">Operador Responsável</label>
-                                <input type="text" id="lavagem-operador" required placeholder="Ex: Marcos Silva">
+                                <input type="text" id="lavagem-operador" maxlength="80" required placeholder="Ex: Marcos Silva">
                             </div>
                             <button class="btn btn-primary" style="width:100%;" onclick="salvarLavagem()">Concluir Lavagem ➔</button>
                         </div>
@@ -649,7 +649,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="jateamento-operador">Operador Responsável</label>
-                                <input type="text" id="jateamento-operador" required placeholder="Ex: Marcos Silva">
+                                <input type="text" id="jateamento-operador" maxlength="80" required placeholder="Ex: Marcos Silva">
                             </div>
                             <button class="btn btn-primary" style="width:100%;" onclick="salvarJateamento()">Concluir Jateamento ➔</button>
                         </div>
@@ -698,15 +698,28 @@
                             </div>
                             <div class="form-group">
                                 <label for="estanqueidade-pressao">Pressão Aplicada (bar / PSI) *</label>
-                                <input type="number" step="0.1" id="estanqueidade-pressao" required placeholder="Ex: 5.0">
+                                <input type="number" step="0.1" min="0" max="1000" id="estanqueidade-pressao" required placeholder="Ex: 5.0">
+                            </div>
+                            <div class="form-group" style="background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
+                                <label style="font-weight: 600; margin-bottom: 8px; display: block;">Resultado do Teste de Pressão *</label>
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--success, #10b981);">
+                                        <input type="radio" name="estanqueidade-resultado" id="estanqueidade-apr" value="aprovado" checked>
+                                        <span><strong>✅ Aprovado (sem vazamento ou trinca)</strong></span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; color: #ef4444;">
+                                        <input type="radio" name="estanqueidade-resultado" id="estanqueidade-rep" value="reprovado">
+                                        <span><strong>❌ Reprovado (vazamento/trinca) — condenar peça</strong></span>
+                                    </label>
+                                </div>
                             </div>
                             <div class="checkbox-group" style="background: rgba(16, 185, 129, 0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.25);">
                                 <input type="checkbox" id="estanqueidade-checkbox" checked>
-                                <label for="estanqueidade-checkbox"><strong>Estanqueidade Aprovada / Sem Vazamentos (Checkbox)</strong></label>
+                                <label for="estanqueidade-checkbox"><strong>Confirmo a execução do teste de estanqueidade</strong></label>
                             </div>
                             <div class="form-group">
                                 <label for="estanqueidade-operador">Operador Responsável</label>
-                                <input type="text" id="estanqueidade-operador" required placeholder="Ex: Roberto Dias">
+                                <input type="text" id="estanqueidade-operador" maxlength="80" required placeholder="Ex: Roberto Dias">
                             </div>
                             <button class="btn btn-primary" style="width:100%;" onclick="salvarEstanqueidade()">Concluir Estanqueidade ➔</button>
                         </div>
@@ -748,11 +761,11 @@
                         <div class="modal-body">
                             <div class="form-group">
                                 <label for="face-altura-entrada">Medida Inicial (mm) *</label>
-                                <input type="number" step="0.01" id="face-altura-entrada" required placeholder="Ex: 95.00">
+                                <input type="number" step="0.01" min="0" max="1000" id="face-altura-entrada" required placeholder="Ex: 95.00">
                             </div>
                             <div class="form-group">
                                 <label for="face-altura-saida">Medida Final (mm) *</label>
-                                <input type="number" step="0.01" id="face-altura-saida" required placeholder="Ex: 94.80">
+                                <input type="number" step="0.01" min="0" max="1000" id="face-altura-saida" required placeholder="Ex: 94.80">
                             </div>
                             <div class="checkbox-group">
                                 <input type="checkbox" id="face-plana" checked>
@@ -764,7 +777,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="face-operador">Operador Responsável</label>
-                                <input type="text" id="face-operador" required placeholder="Ex: Jose Santos">
+                                <input type="text" id="face-operador" maxlength="80" required placeholder="Ex: Jose Santos">
                             </div>
                             <button class="btn btn-primary" style="width:100%;" onclick="salvarFaceamento()">Salvar Faceamento ➔</button>
                         </div>
@@ -837,7 +850,7 @@
 
                             <div class="form-group">
                                 <label for="lap-operador">Operador Responsável</label>
-                                <input type="text" id="lap-operador" required placeholder="Ex: Carlos Lima">
+                                <input type="text" id="lap-operador" maxlength="80" required placeholder="Ex: Carlos Lima">
                             </div>
                             <button class="btn btn-primary" style="width:100%;" onclick="salvarLapidacao()">Registrar Teste de Vácuo ➔</button>
                         </div>
@@ -924,7 +937,7 @@
 
                             <div class="form-group" style="margin-top: 16px;">
                                 <label for="montagem-operador">Operador Responsável</label>
-                                <input type="text" id="montagem-operador" required placeholder="Ex: Julio Ribeiro">
+                                <input type="text" id="montagem-operador" maxlength="80" required placeholder="Ex: Julio Ribeiro">
                             </div>
                             <button class="btn btn-primary" style="width:100%;" onclick="salvarMontagem()">Concluir Montagem ➔</button>
                         </div>
@@ -972,7 +985,7 @@
 
                             <div class="form-group">
                                 <label for="qual-obs">Observações Técnicas do Relatório</label>
-                                <textarea id="qual-obs" rows="2" placeholder="Ex: Medições, estanqueidade, vácuo e montagem inspecionados e aprovados."></textarea>
+                                <textarea id="qual-obs" rows="2" maxlength="1000" placeholder="Ex: Medições, estanqueidade, vácuo e montagem inspecionados e aprovados."></textarea>
                             </div>
 
                             <div class="checkbox-group" style="background: rgba(16, 185, 129, 0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.25);">
@@ -987,7 +1000,7 @@
 
                             <div class="form-group">
                                 <label for="qual-tecnico">Técnico de Qualidade Responsável *</label>
-                                <input type="text" id="qual-tecnico" required placeholder="Ex: Pedro Almeida">
+                                <input type="text" id="qual-tecnico" maxlength="80" required placeholder="Ex: Pedro Almeida">
                             </div>
                             <button class="btn btn-primary" style="width:100%;" onclick="salvarQualidade()">Salvar Qualidade & Emitir Relatório ➔</button>
                         </div>
@@ -1040,7 +1053,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="pint-operador">Operador Responsável</label>
-                                <input type="text" id="pint-operador" required placeholder="Ex: Carlos Lima">
+                                <input type="text" id="pint-operador" maxlength="80" required placeholder="Ex: Carlos Lima">
                             </div>
                             <button class="btn btn-primary" style="width:100%;" onclick="salvarPintura()">Concluir Pintura & Liberar p/ Expedição ➔</button>
                         </div>
@@ -1127,17 +1140,17 @@
 
                             <div class="form-group">
                                 <label for="exp-nf-retorno">Número da Nota Fiscal *</label>
-                                <input type="text" id="exp-nf-retorno" required placeholder="Ex: NF-77382">
+                                <input type="text" id="exp-nf-retorno" maxlength="30" required placeholder="Ex: NF-77382">
                             </div>
 
                             <div class="form-group">
                                 <label for="exp-veiculo">Veículo (Placa / Modelo) *</label>
-                                <input type="text" id="exp-veiculo" required placeholder="Ex: Caminhão VW 24.280 - Placa ABC-1D23">
+                                <input type="text" id="exp-veiculo" maxlength="20" required placeholder="Ex: Placa ABC-1D23">
                             </div>
 
                             <div class="form-group">
                                 <label for="exp-motorista">Motorista *</label>
-                                <input type="text" id="exp-motorista" required placeholder="Ex: João Ferreira">
+                                <input type="text" id="exp-motorista" maxlength="80" required placeholder="Ex: João Ferreira">
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
@@ -1262,13 +1275,13 @@
                 <div class="panel glass" style="margin-top: 24px;">
                     <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                         <div>
-                            <h3>🔒 Diagnóstico das 20 Verificações de Segurança & Criptografia (Score: <span id="sec-score-badge" style="color:var(--success);">20/20 ATIVAS</span>)</h3>
+                            <h3>🔒 Diagnóstico das 20 Verificações de Segurança & Criptografia (Score: <span id="sec-score-badge" style="color:var(--text-muted);">Calculando…</span>)</h3>
                             <span>Auditoria em tempo real de HTTPS, CORS, PBKDF2, Cookies HttpOnly, Secrets, RBAC, Sessões HMAC, RLS Supabase, Rate Limits, SQLi, XSS, CSRF, Headers, Uploads, Erros, Cifra CTR-HMAC, Dependências, Backup e Alertas</span>
                         </div>
                         <div style="display:flex; gap:10px; flex-wrap:wrap;">
                             <button class="btn btn-secondary btn-sm" onclick="loadPainelSeguranca20Itens()">🔄 Revalidar 20 Itens</button>
                             <button class="btn btn-secondary btn-sm" onclick="gerarBackupManual()">💾 Gerar Backup Criptografado</button>
-                            <button class="btn btn-primary btn-sm" onclick="exportarBackupJson()">📥 Exportar Backup (JSON + SHA-256)</button>
+                            <button class="btn btn-primary btn-sm" onclick="exportarBackupJson()">📥 Exportar Backup Criptografado</button>
                         </div>
                     </div>
                     <div class="panel-body">
@@ -1528,7 +1541,7 @@
         <div class="modal-content glass" style="max-width: 480px;">
             <div class="modal-header">
                 <h3>🔑 Alterar Minha Senha</h3>
-                <button class="close-btn" onclick="closeModal('modal-alterar-senha')">&times;</button>
+                <button class="close-btn" id="btn-close-alterar-senha" onclick="closeModal('modal-alterar-senha')">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="form-alterar-senha" onsubmit="salvarAlteracaoSenha(event)">
@@ -1567,6 +1580,6 @@
     <!-- Notification Toast -->
     <div id="toast-wrap" class="toast-wrap"></div>
 
-    <script src="/app.js?v=6.0"></script>
+    <script src="/app.js?v=7.0"></script>
 </body>
 </html>

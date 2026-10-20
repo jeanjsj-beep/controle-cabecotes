@@ -1,6 +1,38 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, BeforeValidator, StringConstraints
 from typing import List, Optional, Any
+from typing_extensions import Annotated
 from datetime import datetime
+import re as _re
+
+# --- Tipos de entrada seguros (validação de comprimento, intervalo e limpeza de texto) ---
+_CONTROLES = _re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def limpar_texto(valor):
+    """Remove caracteres de controle e os delimitadores de tag HTML ('<' e '>') de qualquer texto digitado
+    por usuários. É a defesa em profundidade no servidor; a defesa principal é o escape na saída (frontend)."""
+    if isinstance(valor, str):
+        return _CONTROLES.sub("", valor).replace("<", "").replace(">", "").strip()
+    return valor
+
+
+def _foto_para_none(valor):
+    if isinstance(valor, str) and not valor.strip():
+        return None
+    return valor
+
+
+def Texto(max_len: int, min_len: int = 0):
+    return Annotated[str, BeforeValidator(limpar_texto), StringConstraints(min_length=min_len, max_length=max_len)]
+
+
+# Somente caminhos internos gerados pelo endpoint /api/upload são aceitos como URL de foto
+FotoUrl = Annotated[
+    str,
+    BeforeValidator(_foto_para_none),
+    StringConstraints(pattern=r"^/uploads/[A-Za-z0-9_.-]{1,120}$"),
+]
+Medida = Annotated[float, Field(ge=0, le=1000, allow_inf_nan=False)]
 
 # --- Cliente ---
 class ClienteBase(BaseModel):
@@ -10,8 +42,12 @@ class ClienteBase(BaseModel):
     email: Optional[str] = None
     telefone: Optional[str] = None
 
-class ClienteCreate(ClienteBase):
-    pass
+class ClienteCreate(BaseModel):
+    nome: Texto(120, 2)
+    cnpj: Optional[Texto(20)] = None
+    inscricao_estadual: Optional[Texto(20)] = None
+    email: Optional[Texto(120)] = None
+    telefone: Optional[Texto(30)] = None
 
 class ClienteResponse(ClienteBase):
     id: int
@@ -144,18 +180,25 @@ class LoteBase(BaseModel):
     nf_remessa: Optional[str] = None
 
 class LotePreCadastro(BaseModel):
-    cliente_nome: str
-    nf_remessa: str
-    quantidade_estimada: int
+    cliente_nome: Texto(120, 2)
+    nf_remessa: Texto(30)
+    quantidade_estimada: int = Field(default=0, ge=0, le=1000)
 
 class LoteCreate(LoteBase):
     pass
 
 class EntradaLoteInput(BaseModel):
-    cliente_id: Optional[int] = None
+    cliente_id: Optional[int] = Field(default=None, ge=1)
     novo_cliente: Optional[ClienteCreate] = None
-    quantidade: int
-    identificacoes_pecas: List[str]
+    quantidade: int = Field(ge=1, le=200)
+    identificacoes_pecas: List[Texto(60)] = Field(min_length=1, max_length=200)
+
+class LoteResumo(BaseModel):
+    id: int
+    codigo_lote: str
+    cliente_nome: str
+    status: str
+    model_config = ConfigDict(from_attributes=True)
 
 class LoteResponse(LoteBase):
     id: int
@@ -176,33 +219,38 @@ class LoteResponse(LoteBase):
 
 # --- Entradas de Etapas ---
 class LavagemInput(BaseModel):
-    foto_url: Optional[str] = None
+    foto_url: Optional[FotoUrl] = None
     checkbox: bool = True
-    operador: str
+    operador: Texto(80, 1)
 
 class JateamentoInput(BaseModel):
-    foto_url: Optional[str] = None
+    foto_url: Optional[FotoUrl] = None
     checkbox: bool = True
-    operador: str
+    operador: Texto(80, 1)
 
 class EstanqueidadeInput(BaseModel):
-    foto_url: Optional[str] = None
+    foto_url: Optional[FotoUrl] = None
     checkbox: bool = True
-    pressao_aplicada: float
-    operador: str
+    aprovada: bool = True  # False = vazamento/trinca -> peça condenada
+    pressao_aplicada: Medida
+    operador: Texto(80, 1)
 
 class FaceamentoInput(BaseModel):
-    altura_entrada: float # Medida Inicial
-    altura_saida: float   # Medida Final
+    altura_entrada: Medida # Medida Inicial
+    altura_saida: Medida   # Medida Final
     plana: bool = True
     condenado: bool = False
-    operador: str
+    operador: Texto(80, 1)
 
 class LapidacaoInput(BaseModel):
-    confirmacao_vacuo: str # "APR" ou "REP"
+    confirmacao_vacuo: Annotated[
+        str,
+        BeforeValidator(lambda v: v.strip().upper() if isinstance(v, str) else v),
+        StringConstraints(pattern=r"^(APR|REP)$"),
+    ]  # "APR" ou "REP"
     trocou_valvula: Optional[bool] = False
     trocou_sede: Optional[bool] = False
-    operador: str
+    operador: Texto(80, 1)
 
 class MontagemInput(BaseModel):
     valvula_exaustao: bool = False
@@ -211,60 +259,62 @@ class MontagemInput(BaseModel):
     sede_admissao: bool = False
     guia_exaustao: bool = False
     guia_admissao: bool = False
-    operador: str
+    operador: Texto(80, 1)
 
 class QualidadeInput(BaseModel):
     aprovada: bool = True
-    fotos_urls: List[str] = []
-    observacoes: Optional[str] = None
-    altura_cilindro: Optional[float] = None
+    fotos_urls: List[FotoUrl] = Field(default_factory=list, max_length=10)
+    observacoes: Optional[Texto(1000)] = None
+    altura_cilindro: Optional[Medida] = None
     gerar_relatorio: bool = True
-    tecnico: str
+    tecnico: Texto(80, 1)
 
 class PinturaInput(BaseModel):
     passa: bool = True
-    operador: str
-    foto_url: Optional[str] = None
+    operador: Texto(80, 1)
+    foto_url: Optional[FotoUrl] = None
 
 class ExpedicaoInput(BaseModel):
-    foto_url: Optional[str] = None
-    nf_retorno: str
-    veiculo: str
-    motorista: str
-    horario_saida: Optional[str] = None
-    pallet_almoxarifado_final: Optional[str] = None
+    foto_url: Optional[FotoUrl] = None
+    nf_retorno: Texto(30, 1)
+    veiculo: Texto(20, 1)
+    motorista: Texto(80, 1)
+    horario_saida: Optional[Annotated[str, StringConstraints(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")]] = None
+    pallet_almoxarifado_final: Optional[Annotated[str, StringConstraints(pattern=r"^ALM-[AB]\d{2}$")]] = None
 
 class FotoUploadInput(BaseModel):
-    filename: str
-    content_base64: str
+    filename: Texto(120, 1)
+    content_base64: str = Field(min_length=16, max_length=14_000_000)
 
 
 # --- Autenticação & Usuários ---
 class LoginInput(BaseModel):
-    username: str
-    password: str
+    username: Annotated[str, StringConstraints(max_length=80)]
+    password: Annotated[str, StringConstraints(max_length=256)]
 
 class UsuarioCreate(BaseModel):
-    username: str
-    nome_completo: str
-    cargo: Optional[str] = "Operador"
-    password: str
+    username: Annotated[str, StringConstraints(max_length=40)]
+    nome_completo: Texto(120, 3)
+    cargo: Optional[Texto(80)] = "Operador"
+    password: Annotated[str, StringConstraints(max_length=128)]
     is_admin: bool = False
     ativo: bool = True
-    permissoes: List[str] = []
+    permissoes: List[Annotated[str, StringConstraints(max_length=30)]] = Field(default_factory=list, max_length=30)
+    must_change_password: bool = False
 
 class UsuarioUpdate(BaseModel):
-    nome_completo: Optional[str] = None
-    cargo: Optional[str] = None
-    password: Optional[str] = None
+    nome_completo: Optional[Texto(120, 3)] = None
+    cargo: Optional[Texto(80)] = None
+    password: Optional[Annotated[str, StringConstraints(max_length=128)]] = None
     is_admin: Optional[bool] = None
     ativo: Optional[bool] = None
-    permissoes: Optional[List[str]] = None
+    permissoes: Optional[List[Annotated[str, StringConstraints(max_length=30)]]] = Field(default=None, max_length=30)
     desbloquear: Optional[bool] = False
+    must_change_password: Optional[bool] = None
 
 class AlterarSenhaInput(BaseModel):
-    senha_atual: str
-    nova_senha: str
+    senha_atual: Annotated[str, StringConstraints(max_length=256)]
+    nova_senha: Annotated[str, StringConstraints(max_length=128)]
 
 class UsuarioResponse(BaseModel):
     id: int
@@ -278,11 +328,13 @@ class UsuarioResponse(BaseModel):
     bloqueado_ate: Optional[datetime] = None
     ultimo_login: Optional[datetime] = None
     criado_em: Optional[datetime] = None
+    must_change_password: bool = False
     model_config = ConfigDict(from_attributes=True)
 
 class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+    # A sessão trafega somente em cookie HttpOnly; o token nunca é exposto ao JavaScript.
+    access_token: Optional[str] = None
+    token_type: str = "cookie"
     expira_em: datetime
     usuario: UsuarioResponse
 

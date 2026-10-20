@@ -7,8 +7,14 @@ try:
 except ImportError:
     from database import get_db
     import models
-from .auth import obter_usuario_atual
+from .auth import obter_usuario_atual, requer_permissao, requer_qualquer_permissao
 import datetime
+
+MODULOS_OPERACIONAIS = [
+    "entrada", "recebimento", "lavagem", "jateamento", "estanqueidade",
+    "faceamento", "lapidacao", "montagem", "qualidade", "pintura",
+    "expedicao", "relatorios", "dashboard"
+]
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"], dependencies=[Depends(obter_usuario_atual)])
 
@@ -19,7 +25,12 @@ SPACES_ALMOXARIFADO = [
     f"ALM-B{i:02d}" for i in range(1, 13)
 ]
 
-@router.get("/stats")
+ETAPAS_PROCESSO = [
+    "TRIAGEM", "LAVAGEM", "JATEAMENTO", "ESTANQUEIDADE",
+    "FACEAMENTO", "LAPIDACAO", "MONTAGEM", "QUALIDADE", "PINTURA"
+]
+
+@router.get("/stats", dependencies=[Depends(requer_permissao("dashboard"))])
 def obter_metricas_dashboard(db: Session = Depends(get_db)):
     todos_lotes = db.query(models.Lote).all()
     todos_cabecotes = db.query(models.Cabecote).all()
@@ -82,18 +93,47 @@ def obter_metricas_dashboard(db: Session = Depends(get_db)):
     espacos_ociosos = [k for k, v in pallets_dict.items() if v["status"] == "LIVRE"]
     taxa_ocupacao_almoxarifado = round((len(espacos_ocupados) / max(1, len(SPACES_ALMOXARIFADO))) * 100, 1)
 
-    gargalos = {
-        "TRIAGEM": 1.2,
-        "LAVAGEM": 1.5,
-        "JATEAMENTO": 1.8,
-        "ESTANQUEIDADE": 2.2,
-        "FACEAMENTO": 4.5,
-        "LAPIDACAO": 3.2,
-        "MONTAGEM": 2.8,
-        "QUALIDADE": 1.5,
-        "PINTURA": 2.5
-    }
-    posto_gargalo = max(gargalos.items(), key=lambda x: x[1])[0]
+    # 1. Contagem real da fila em cada etapa do processo
+    gargalos_fila = {etapa: etapas_cabecotes.get(etapa, 0) for etapa in ETAPAS_PROCESSO}
+
+    # 2. Cálculo dinâmico do tempo médio em cada etapa a partir do histórico de movimentações
+    tempos_acumulados = {etapa: [] for etapa in ETAPAS_PROCESSO}
+    try:
+        movs_cabecote = db.query(models.Movimentacao).filter(
+            models.Movimentacao.cabecote_id.isnot(None)
+        ).order_by(models.Movimentacao.cabecote_id, models.Movimentacao.data_hora.asc()).all()
+
+        movs_por_cab = {}
+        for m in movs_cabecote:
+            movs_por_cab.setdefault(m.cabecote_id, []).append(m)
+
+        for cid, lista in movs_por_cab.items():
+            for idx in range(len(lista) - 1):
+                m_atual = lista[idx]
+                m_prox = lista[idx + 1]
+                etapa = m_atual.estagio_destino
+                if etapa in tempos_acumulados and m_prox.data_hora and m_atual.data_hora:
+                    delta_horas = (m_prox.data_hora - m_atual.data_hora).total_seconds() / 3600.0
+                    if 0 < delta_horas < 720: # ignora outliers acima de 30 dias
+                        tempos_acumulados[etapa].append(delta_horas)
+    except Exception:
+        pass
+
+    gargalos_tempo_medio = {}
+    for etapa in ETAPAS_PROCESSO:
+        amostras = tempos_acumulados[etapa]
+        gargalos_tempo_medio[etapa] = round(sum(amostras) / len(amostras), 1) if amostras else 0.0
+
+    # 3. Identificação do posto gargalo (prioriza tamanho da fila, depois tempo médio)
+    max_fila = max(gargalos_fila.values()) if gargalos_fila else 0
+    if max_fila > 0:
+        posto_gargalo = max(gargalos_fila.items(), key=lambda x: (x[1], gargalos_tempo_medio.get(x[0], 0)))[0]
+    else:
+        max_tempo = max(gargalos_tempo_medio.values()) if gargalos_tempo_medio else 0
+        if max_tempo > 0:
+            posto_gargalo = max(gargalos_tempo_medio.items(), key=lambda x: x[1])[0]
+        else:
+            posto_gargalo = "Sem gargalos"
 
     now = datetime.datetime.utcnow()
     lotes_com_prazo = [l for l in todos_lotes if l.data_estimada_entrega is not None]
@@ -162,7 +202,8 @@ def obter_metricas_dashboard(db: Session = Depends(get_db)):
         "status_lotes": status_lotes,
         "etapas_cabecotes": etapas_cabecotes,
         "posto_gargalo": posto_gargalo,
-        "gargalos_tempo_medio_horas": gargalos,
+        "gargalos_tempo_medio_horas": gargalos_tempo_medio,
+        "gargalos_fila": gargalos_fila,
         "pallets_detalhados": list(pallets_dict.values()),
         "almoxarifado_espacos_ociosos": espacos_ociosos,
         "almoxarifado_espacos_ocupados": espacos_ocupados,
@@ -173,7 +214,7 @@ def obter_metricas_dashboard(db: Session = Depends(get_db)):
     }
 
 
-@router.get("/sala/{nome_etapa}")
+@router.get("/sala/{nome_etapa}", dependencies=[Depends(requer_permissao("dashboard"))])
 def obter_detalhes_sala(nome_etapa: str, db: Session = Depends(get_db)):
     nome_upper = nome_etapa.upper()
     cabecotes = db.query(models.Cabecote).filter(models.Cabecote.status_etapa == nome_upper).all()
@@ -215,7 +256,7 @@ def obter_detalhes_sala(nome_etapa: str, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/buscar")
+@router.get("/buscar", dependencies=[Depends(requer_qualquer_permissao(MODULOS_OPERACIONAIS))])
 def buscar_global(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     termo = f"%{q.strip()}%"
 

@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, Text
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import expression
 import datetime
 import sys
 
@@ -179,6 +180,10 @@ class Usuario(Base):
     criado_em = Column(DateTime, default=datetime.datetime.utcnow)
     token_sessao = Column(String, nullable=True, index=True)
     token_expira_em = Column(DateTime, nullable=True)
+    # Versão da sessão: incrementada em logout, troca/reset de senha e desativação (revoga todos os tokens emitidos)
+    token_version = Column(Integer, default=0, nullable=False, server_default="0")
+    # Força a troca da senha no próximo login (senha inicial / redefinida por administrador)
+    must_change_password = Column(Boolean, default=False, nullable=False, server_default=expression.false())
 
 
 class FotoArmazenada(Base):
@@ -217,6 +222,34 @@ class BackupAutomatico(Base):
     sha256_checksum = Column(String, nullable=False)
     resumo_registros = Column(String, nullable=True)
     payload_criptografado = Column(Text, nullable=False)
+
+
+class TentativaLogin(Base):
+    """Tentativas de login por IP/usuário. Armazenadas no banco para que o limite de tentativas
+    funcione de forma consistente entre as várias instâncias Serverless (Vercel)."""
+    __tablename__ = "tentativas_login"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ip = Column(String, nullable=False, index=True)
+    username = Column(String, nullable=True, index=True)
+    criado_em = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    sucesso = Column(Boolean, default=False, nullable=False)
+
+
+class Configuracao(Base):
+    """Configurações persistentes (chave/valor) compartilhadas entre instâncias."""
+    __tablename__ = "configuracoes"
+
+    chave = Column(String, primary_key=True)
+    valor = Column(String, nullable=False)
+
+
+class Contador(Base):
+    """Contadores atômicos (códigos de lote e séries internas) sem condição de corrida."""
+    __tablename__ = "contadores"
+
+    nome = Column(String, primary_key=True)
+    valor = Column(Integer, nullable=False, default=0)
 
 
 sys.modules.setdefault("models", sys.modules[__name__])

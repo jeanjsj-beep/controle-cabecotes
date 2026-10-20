@@ -8,13 +8,19 @@ except ImportError:
     from database import get_db
     import models, schemas
 from .etapas import construir_e_salvar_relatorio
-from .auth import obter_usuario_atual, requer_permissao
+from .auth import obter_usuario_atual, requer_permissao, requer_qualquer_permissao
 import json
+
+MODULOS_OPERACIONAIS = [
+    "entrada", "recebimento", "lavagem", "jateamento", "estanqueidade",
+    "faceamento", "lapidacao", "montagem", "qualidade", "pintura",
+    "expedicao", "relatorios", "dashboard"
+]
 
 router = APIRouter(prefix="/api/cabecotes", tags=["Cabecotes"], dependencies=[Depends(obter_usuario_atual)])
 
 # 1. Obter detalhes do cabeçote por número de série
-@router.get("/buscar/{numero_serie}", response_model=schemas.CabecoteResponse)
+@router.get("/buscar/{numero_serie}", response_model=schemas.CabecoteResponse, dependencies=[Depends(requer_qualquer_permissao(MODULOS_OPERACIONAIS))])
 def obter_cabecote_por_serial(numero_serie: str, db: Session = Depends(get_db)):
     cabecote = db.query(models.Cabecote).filter(models.Cabecote.numero_serie == numero_serie).first()
     if not cabecote:
@@ -22,7 +28,7 @@ def obter_cabecote_por_serial(numero_serie: str, db: Session = Depends(get_db)):
     return cabecote
 
 # 2. Listar todos os relatórios individuais disponíveis ou todos os cabeçotes com relatório
-@router.get("/relatorios/lista")
+@router.get("/relatorios/lista", dependencies=[Depends(requer_qualquer_permissao(["relatorios", "qualidade", "expedicao"]))])
 def listar_relatorios(db: Session = Depends(get_db)):
     cabecotes = db.query(models.Cabecote).order_by(models.Cabecote.id.desc()).all()
     resultado = []
@@ -44,7 +50,7 @@ def listar_relatorios(db: Session = Depends(get_db)):
     return resultado
 
 # 3. Obter ou Gerar Relatório Técnico Individual de um Cabeçote (Salvo no Banco de Dados)
-@router.get("/{cabecote_id}/relatorio")
+@router.get("/{cabecote_id}/relatorio", dependencies=[Depends(requer_qualquer_permissao(["relatorios", "qualidade", "expedicao"]))])
 def obter_relatorio_cabecote(cabecote_id: int, atualizar: bool = True, db: Session = Depends(get_db)) -> Dict[str, Any]:
     cabecote = db.query(models.Cabecote).filter(models.Cabecote.id == cabecote_id).first()
     if not cabecote:
@@ -59,7 +65,7 @@ def obter_relatorio_cabecote(cabecote_id: int, atualizar: bool = True, db: Sessi
         return construir_e_salvar_relatorio(db, cabecote)
 
 # 4. Obter detalhes de um cabeçote específico por ID
-@router.get("/{cabecote_id}", response_model=schemas.CabecoteResponse)
+@router.get("/{cabecote_id}", response_model=schemas.CabecoteResponse, dependencies=[Depends(requer_qualquer_permissao(MODULOS_OPERACIONAIS))])
 def obter_cabecote(cabecote_id: int, db: Session = Depends(get_db)):
     cabecote = db.query(models.Cabecote).filter(models.Cabecote.id == cabecote_id).first()
     if not cabecote:
@@ -67,7 +73,7 @@ def obter_cabecote(cabecote_id: int, db: Session = Depends(get_db)):
     return cabecote
 
 # 5. Listar cabeçotes por etapa (ex: LAVAGEM, JATEAMENTO, ESTANQUEIDADE, FACEAMENTO, etc.)
-@router.get("", response_model=List[schemas.CabecoteResponse])
+@router.get("", response_model=List[schemas.CabecoteResponse], dependencies=[Depends(requer_qualquer_permissao(MODULOS_OPERACIONAIS))])
 def listar_cabecotes(etapa: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(models.Cabecote)
     if etapa:

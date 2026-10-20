@@ -9,8 +9,14 @@ except ImportError:
     import models, schemas
 from .clientes import criar_cliente
 from .etapas import construir_e_salvar_relatorio
-from .auth import obter_usuario_atual, requer_permissao
+from .auth import obter_usuario_atual, requer_permissao, requer_qualquer_permissao
 import datetime
+
+MODULOS_OPERACIONAIS = [
+    "entrada", "recebimento", "lavagem", "jateamento", "estanqueidade",
+    "faceamento", "lapidacao", "montagem", "qualidade", "pintura",
+    "expedicao", "relatorios", "dashboard"
+]
 
 router = APIRouter(prefix="/api/lotes", tags=["Lotes"], dependencies=[Depends(obter_usuario_atual)])
 
@@ -91,7 +97,7 @@ def registrar_entrada_lote(dados: schemas.EntradaLoteInput, db: Session = Depend
 
 
 # 1. Pré-cadastro do Cliente
-@router.post("/pre-cadastro", response_model=schemas.LoteResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/pre-cadastro", response_model=schemas.LoteResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(requer_qualquer_permissao(["entrada", "recebimento"]))])
 def pre_cadastrar_lote(lote_in: schemas.LotePreCadastro, db: Session = Depends(get_db)):
     timestamp = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
     codigo_pre = f"PRE-{timestamp}"
@@ -173,8 +179,15 @@ def receber_lote_fisico(lote_id: int, seriais: List[str], db: Session = Depends(
     return lote
 
 
-# 3. Listagem Geral de Lotes (opção de filtrar por status)
-@router.get("", response_model=List[schemas.LoteResponse])
+# 3. Resumo Leve de Lotes (para eliminação do problema N+1)
+@router.get("/resumo", response_model=List[schemas.LoteResumo], dependencies=[Depends(requer_qualquer_permissao(MODULOS_OPERACIONAIS))])
+def listar_lotes_resumo(db: Session = Depends(get_db)):
+    lotes = db.query(models.Lote.id, models.Lote.codigo_lote, models.Lote.cliente_nome, models.Lote.status).all()
+    return [{"id": l[0], "codigo_lote": l[1], "cliente_nome": l[2], "status": l[3]} for l in lotes]
+
+
+# 4. Listagem Geral de Lotes (opção de filtrar por status)
+@router.get("", response_model=List[schemas.LoteResponse], dependencies=[Depends(requer_qualquer_permissao(MODULOS_OPERACIONAIS))])
 def listar_lotes(status: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(models.Lote)
     if status:
@@ -183,8 +196,8 @@ def listar_lotes(status: Optional[str] = None, db: Session = Depends(get_db)):
     return lotes
 
 
-# 4. Detalhes de um Lote Específico
-@router.get("/{lote_id}", response_model=schemas.LoteResponse)
+# 5. Detalhes de um Lote Específico
+@router.get("/{lote_id}", response_model=schemas.LoteResponse, dependencies=[Depends(requer_qualquer_permissao(MODULOS_OPERACIONAIS))])
 def obter_lote(lote_id: int, db: Session = Depends(get_db)):
     lote = db.query(models.Lote).filter(models.Lote.id == lote_id).first()
     if not lote:
@@ -192,7 +205,7 @@ def obter_lote(lote_id: int, db: Session = Depends(get_db)):
     return lote
 
 
-# 5. Expedição e Saída do Lote (Foto, Número da Nota, Veículo, Motorista)
+# 6. Expedição e Saída do Lote (Foto, Número da Nota, Veículo, Motorista)
 @router.post("/{lote_id}/expedir", response_model=schemas.LoteResponse, dependencies=[Depends(requer_permissao("expedicao"))])
 def expedir_lote(lote_id: int, dados: schemas.ExpedicaoInput, db: Session = Depends(get_db)):
     lote = db.query(models.Lote).filter(models.Lote.id == lote_id).first()

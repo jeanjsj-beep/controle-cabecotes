@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Manual do Usuário — SCRC (Controle de Recondicionamento de Cabeçotes)</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 16mm 15mm 18mm 15mm;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            color: #1e293b;
+            background: #ffffff;
+            line-height: 1.55;
+            font-size: 10.5pt;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        /* Capa */
+        .cover {
+            min-height: 255mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: linear-gradient(145deg, #0f172a 0%, #1e293b 60%, #0f172a 100%);
+            color: #f8fafc;
+            padding: 28mm 22mm;
+            border-radius: 12px;
+            border: 2px solid #38bdf8;
+        }
+        .cover-badge {
+            display: inline-block;
+            background: rgba(56, 189, 248, 0.18);
+            color: #38bdf8;
+            border: 1px solid #38bdf8;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 9.5pt;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+        }
+        .cover h1 {
+            font-size: 27pt;
+            line-height: 1.18;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 14px;
+        }
+        .cover h2 {
+            font-size: 14pt;
+            font-weight: 400;
+            color: #cbd5e1;
+            margin-bottom: 28px;
+        }
+        .cover-highlights {
+            background: rgba(255, 255, 255, 0.06);
+            border-left: 4px solid #38bdf8;
+            padding: 18px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .cover-highlights h3 {
+            font-size: 11.5pt;
+            color: #38bdf8;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .cover-highlights ul {
+            list-style: none;
+        }
+        .cover-highlights li {
+            margin-bottom: 8px;
+            font-size: 10.5pt;
+            color: #e2e8f0;
+        }
+        .cover-footer {
+            border-top: 1px solid rgba(255,255,255,0.15);
+            padding-top: 16px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 9.5pt;
+            color: #94a3b8;
+        }
+
+        /* Cabeçalhos de Seção */
+        .section-header {
+            border-bottom: 2px solid #0284c7;
+            padding-bottom: 8px;
+            margin-top: 18px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .section-header h2 {
+            font-size: 15pt;
+            color: #0f172a;
+            font-weight: 800;
+        }
+        .section-tag {
+            background: #e0f2fe;
+            color: #0369a1;
+            font-weight: 700;
+            font-size: 8.5pt;
+            padding: 4px 10px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+        h3 {
+            font-size: 12pt;
+            color: #0f172a;
+            margin-top: 14px;
+            margin-bottom: 6px;
+        }
+        p {
+            margin-bottom: 10px;
+            text-align: justify;
+        }
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 12px;
+        }
+        li {
+            margin-bottom: 5px;
+        }
+
+        /* Cartões e Boxes */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .card {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 12px 14px;
+            break-inside: avoid;
+        }
+        .card h4 {
+            font-size: 10.5pt;
+            color: #0369a1;
+            margin-bottom: 6px;
+        }
+        .card p {
+            font-size: 9.5pt;
+            margin-bottom: 0;
+            text-align: left;
+            color: #334155;
+        }
+        .callout {
+            background: #f0f9ff;
+            border-left: 4px solid #0284c7;
+            padding: 12px 14px;
+            border-radius: 6px;
+            margin: 12px 0;
+            break-inside: avoid;
+        }
+        .callout.success {
+            background: #ecfdf5;
+            border-left-color: #10b981;
+        }
+        .callout.warning {
+            background: #fffbeb;
+            border-left-color: #f59e0b;
+        }
+        .callout-title {
+            font-weight: 700;
+            font-size: 10pt;
+            margin-bottom: 4px;
+            color: #0f172a;
+        }
+
+        /* Tabelas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0 16px 0;
+            font-size: 9.5pt;
+            break-inside: avoid;
+        }
+        th {
+            background: #0f172a;
+            color: #ffffff;
+            text-align: left;
+            padding: 8px 10px;
+            font-weight: 700;
+        }
+        td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #cbd5e1;
+            vertical-align: top;
+        }
+        tr:nth-child(even) td {
+            background: #f8fafc;
+        }
+
+        /* Fluxo Visual */
+        .flow-steps {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin: 14px 0;
+            break-inside: avoid;
+        }
+        .flow-box {
+            background: #0f172a;
+            color: #f8fafc;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            border-top: 3px solid #38bdf8;
+        }
+        .flow-box .step-num {
+            font-size: 8pt;
+            color: #38bdf8;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .flow-box .step-name {
+            font-size: 9.5pt;
+            font-weight: 700;
+            margin: 4px 0;
+        }
+        .flow-box .step-desc {
+            font-size: 8pt;
+            color: #cbd5e1;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 8.5pt;
+            font-weight: 700;
+        }
+        .badge-blue { background: #e0f2fe; color: #0369a1; }
+        .badge-green { background: #d1fae5; color: #047857; }
+        .badge-amber { background: #fef3c7; color: #b45309; }
+        .badge-red { background: #fee2e2; color: #b91c1c; }
+    </style>
+</head>
+<body>
+
+    <!-- PÁGINA 1: CAPA -->
+    <div class="cover">
+        <div>
+            <div class="cover-badge">DOCUMENTO OFICIAL • GUIA FUNCIONAL E OPERACIONAL</div>
+            <h1>MANUAL DO USUÁRIO<br>SISTEMA SCRC</h1>
+            <h2>Sistema de Controle e Rastreabilidade de Recondicionamento de Cabeçotes</h2>
+
+            <div class="cover-highlights">
+                <h3>O que você encontrará neste manual:</h3>
+                <ul>
+                    <li>✔ <strong>Propósito do Sistema:</strong> Como o SCRC organiza a oficina e elimina extravios e retrabalhos sem registro.</li>
+                    <li>✔ <strong>Benefícios no Dia a Dia:</strong> Rastreabilidade por peça, fotos em todas as etapas e relatórios em PDF para o cliente.</li>
+                    <li>✔ <strong>Uso no Computador e no Celular:</strong> Como operar o sistema diretamente na bancada da oficina tirando fotos com o celular.</li>
+                    <li>✔ <strong>Passo a Passo de Ponta a Ponta:</strong> Da chegada do lote até a expedição, qualidade e gestão de acessos.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="cover-footer">
+            <div>
+                <strong>Plataforma Web & Mobile SCRC</strong><br>
+                Acesso em Produção: https://controle-cabecotes-hpef.vercel.app
+            </div>
+            <div style="text-align: right;">
+                <strong>Versão 3.0 — Edição Operacional</strong><br>
+                Classificação: Uso Interno e Treinamento de Equipe
+            </div>
+        </div>
+    </div>
+
+    <!-- PÁGINA 2: VISÃO GERAL, PROPÓSITO E BENEFÍCIOS -->
+    <div class="page-break"></div>
+
+    <div class="section-header">
+        <h2>1. Qual é a Intenção do Sistema SCRC?</h2>
+        <span class="section-tag">Visão Geral</span>
+    </div>
+
+    <p>
+        O <strong>SCRC (Sistema de Controle de Recondicionamento de Cabeçotes)</strong> foi criado para transformar a gestão da oficina de retífica e recondicionamento. Em vez de depender apenas de anotações em papel, quadros brancos ou mensagens soltas no WhatsApp, o sistema acompanha <strong>cada cabeçote individualmente</strong> desde o minuto em que ele chega na empresa até o momento em que é entregue de volta ao cliente.
+    </p>
+    <p>
+        A ideia central do sistema é simples: <strong>nenhuma peça avança de setor no escuro</strong>. Cada etapa realizada (lavagem, jateamento, teste de trinca, plaina/faceamento, vácuo, montagem, qualidade e pintura) fica registrada com o nome do operador responsável, data, horário, medidas técnicas e fotos reais da peça.
+    </p>
+
+    <h3>1.1. No que o SCRC auxilia a empresa na prática?</h3>
+    <div class="grid-2">
+        <div class="card">
+            <h4>🔍 1. Fim do "Onde está aquela peça?"</h4>
+            <p>Basta olhar o painel principal ou pesquisar o número de série para saber exatamente em qual bancada ou setor cada cabeçote de cada cliente está naquele segundo.</p>
+        </div>
+        <div class="card">
+            <h4>📸 2. Provas Fotográficas em Cada Etapa</h4>
+            <p>O operador tira a foto direto pelo celular ao concluir a lavagem, jateamento, estanqueidade, qualidade e expedição. Isso protege a oficina contra dúvidas ou reclamações futuras.</p>
+        </div>
+        <div class="card">
+            <h4>⚠️ 3. Identificação Automática de Gargalos</h4>
+            <p>O sistema calcula automaticamente qual setor da oficina está acumulando mais peças (Monitor de Gargalos), ajudando a gerência a realocar a equipe antes que ocorram atrasos.</p>
+        </div>
+        <div class="card">
+            <h4>📄 4. Laudo Técnico Individual em PDF</h4>
+            <p>Ao aprovar um cabeçote na Qualidade, o sistema gera e salva um Relatório Técnico completo com medidas de faceamento, pressão de teste, vácuo e fotos para enviar ao cliente.</p>
+        </div>
+        <div class="card">
+            <h4>💎 5. Controle Inteligente de Retrabalho no Vácuo</h4>
+            <p>Na etapa de Lapidação, se o teste de vácuo reprovar na 1ª vez, o sistema orienta a <strong>Troca de Válvula</strong>. Se reprovar novamente, orienta a <strong>Troca de Sede</strong>, padronizando o processo técnico.</p>
+        </div>
+        <div class="card">
+            <h4>🛡️ 6. Controle de Acesso por Operador</h4>
+            <p>Cada colaborador tem seu próprio login e senha e enxerga apenas as telas do seu setor (por exemplo, o operador da Lavagem vê apenas a fila de Lavagem), mantendo o sistema simples e seguro.</p>
+        </div>
+    </div>
+
+    <div class="section-header">
+        <h2>2. O Caminho do Cabeçote na Oficina (Fluxo das 10 Etapas)</h2>
+        <span class="section-tag">Fluxo Produtivo</span>
+    </div>
+
+    <p>Todo lote recebido no sistema é desmembrado em peças individuais (com código de série automático) que percorrem a linha abaixo conforme a rota definida na triagem:</p>
+
+    <div class="flow-steps">
+        <div class="flow-box">
+            <div class="step-num">Etapa 1</div>
+            <div class="step-name">📥 Entrada</div>
+            <div class="step-desc">Cadastro do cliente, lote e identificação das peças</div>
+        </div>
+        <div class="flow-box">
+            <div class="step-num">Etapa 2</div>
+            <div class="step-name">📋 Triagem</div>
+            <div class="step-desc">Escolha de quais setores a peça vai percorrer</div>
+        </div>
+        <div class="flow-box">
+            <div class="step-num">Etapa 3</div>
+            <div class="step-name">🧼 Lavagem</div>
+            <div class="step-desc">Desengraxe químico + Foto da peça limpa</div>
+        </div>
+        <div class="flow-box">
+            <div class="step-num">Etapa 4</div>
+            <div class="step-name">💨 Jateamento</div>
+            <div class="step-desc">Limpeza abrasiva + Foto e confirmação</div>
+        </div>
+        <div class="flow-box">
+            <div class="step-num">Etapa 5</div>
+            <div class="step-name">💧 Estanqueidade</div>
+            <div class="step-desc">Teste de pressão (Bar), foto e aprovação/trinca</div>
+        </div>
+        <div class="flow-box">
+            <div class="step-num">Etapa 6</div>
+            <div class="step-name">📐 Faceamento</div>
+            <div class="step-desc">Registro da medida inicial e medida final (mm)</div>
+        </div>
+        <div class="flow-box">
+            <div class="step-num">Etapa 7</div>
+            <div class="step-name">💎 Lapidação</div>
+            <div class="step-desc">Teste de vácuo (APR/REP) e controle de válvula/sede</div>
+        </div>
+        <div class="flow-box">
+            <div class="step-num">Etapa 8</div>
+            <div class="step-name">🔧 Montagem</div>
+            <div class="step-desc">Checklist de Válvula, Sede e Guia (Adm/Exaustão)</div>
+        </div>
+        <div class="flow-box">
+            <div class="step-num">Etapa 9</div>
+            <div class="step-name">🛡️ Qualidade</div>
+            <div class="step-desc">Inspeção final, fotos e geração do Relatório PDF</div>
+        </div>
+        <div class="flow-box">
+            <div class="step-num">Etapa 10</div>
+            <div class="step-name">🎨 Pintura & 🚚 Saída</div>
+            <div class="step-desc">Acabamento, alocação no pallet e entrega c/ NF</div>
+        </div>
+    </div>
+
+    <div class="callout">
+        <div class="callout-title">💡 Rota Flexível por Peça:</div>
+        Nem todo cabeçote precisa passar por todas as etapas. Na <strong>Triagem</strong>, se você desmarcar uma etapa (por exemplo, a peça não precisa de Jateamento ou Pintura), o sistema pula automaticamente aquele setor e já envia o cabeçote para o próximo posto correto!
+    </div>
+
+    <!-- PÁGINA 3: ACESSO AO SISTEMA E PASSO A PASSO INICIAL -->
+    <div class="page-break"></div>
+
+    <div class="section-header">
+        <h2>3. Como Acessar e Navegar (Computador e Celular)</h2>
+        <span class="section-tag">Acesso & Uso Mobile</span>
+    </div>
+
+    <h3>3.1. Fazendo Login</h3>
+    <ol>
+        <li>Abra o navegador (Chrome, Safari ou Edge) no computador, tablet ou celular e acesse o endereço do sistema.</li>
+        <li>Digite seu <strong>Usuário (Login)</strong> e sua <strong>Senha de Acesso</strong>.</li>
+        <li>Clique em <strong>Entrar no Sistema</strong>. Sua sessão permanece ativa por 24 horas com cookie seguro <code>HttpOnly</code> mesmo que você abra outras abas.</li>
+    </ol>
+    <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:10px 14px; margin: 10px 0 16px 0; font-size:9.5pt;">
+        <strong>🔑 Primeiro Acesso do Administrador:</strong> Usuário <code>admin</code> e senha inicial <code>Admin@2026</code>. Por protocolo de segurança rigoroso (OWASP), o sistema exigirá imediatamente a redefinição para uma nova senha pessoal forte antes de liberar o acesso aos módulos.
+    </div>
+
+    <h3>3.2. Usando pelo Celular na Oficina</h3>
+    <p>O sistema foi desenhado especialmente para funcionar na palma da mão do operador na bancada:</p>
+    <ul>
+        <li><strong>Barra Inferior Rápida:</strong> No celular, fica fixa na parte de baixo da tela uma barra com atalhos diretos para <em>Dashboard, Entrada, Triagem, Relatórios, Painel Admin e Menu Completo</em>.</li>
+        <li><strong>Câmera Integrada:</strong> Ao clicar em qualquer campo de foto no celular, o aparelho permite abrir a câmera traseira diretamente para fotografar o cabeçote na bancada. O próprio sistema comprime a imagem automaticamente para enviar rápido mesmo em conexões móveis.</li>
+    </ul>
+
+    <div class="section-header">
+        <h2>4. Guia Passo a Passo de Cada Tela do Sistema</h2>
+        <span class="section-tag">Operação Diária</span>
+    </div>
+
+    <h3>📊 4.1. Dashboard Geral (Painel de Controle)</h3>
+    <p>É a primeira tela do sistema e funciona como uma televisão de acompanhamento da fábrica em tempo real:</p>
+    <ul>
+        <li><strong>Rendimento Fabril (OEE Qualidade):</strong> Mostra a porcentagem de cabeçotes aprovados versus condenados.</li>
+        <li><strong>Cumprimento de SLA Comercial:</strong> Mostra a pontualidade dos lotes dentro do prazo combinado.</li>
+        <li><strong>Monitor de Gargalos:</strong> Destaca em amarelo/vermelho qual setor da oficina está com maior acúmulo ou retenção de peças no momento.</li>
+        <li><strong>Salas & Postos da Oficina:</strong> Cartões interativos de todas as etapas. Clicando sobre qualquer sala (ex.: <em>Faceamento</em>), abre-se uma janela mostrando exatamente quais peças estão lá dentro e permite operá-las imediatamente.</li>
+        <li><strong>Mini-Mapa do Almoxarifado (Pallets ALM-A e ALM-B):</strong> Mostra visualmente quais vagas de pallet estão livres (verdes) e quais estão ocupadas com lotes prontos (azuis).</li>
+    </ul>
+
+    <h3>📥 4.2. Passo 1: Entrada de Lote e Cadastro de Cliente</h3>
+    <p>Quando o caminhão ou cliente entrega cabeçotes na recepção:</p>
+    <ol>
+        <li>No menu lateral (ou barra inferior), clique em <strong>1. Entrada de Lote</strong>.</li>
+        <li><strong>Selecione o Cliente:</strong> Escolha um cliente já cadastrado na lista ou selecione a opção <strong>"➕ Cadastrar Novo Cliente"</strong> para preencher Nome/Razão Social, CNPJ, Inscrição Estadual, E-mail e Telefone na mesma tela.</li>
+        <li><strong>Informe a Quantidade de Cabeçotes:</strong> Digite quantas peças vieram no lote (ex.: 1, 5, 10).</li>
+        <li><strong>Identifique Cada Peça:</strong> O sistema cria automaticamente uma linha para cada cabeçote. Digite a identificação ou modelo de cada um (ex.: <em>Cabeçote Scania P360 - Peça 1</em>).</li>
+        <li>Clique em <strong>Confirmar Entrada e Gerar Lote</strong>. O sistema gerará automaticamente o código do lote e o número de série único de cada peça.</li>
+    </ol>
+
+    <h3>📋 4.3. Passo 2: Fila & Triagem (Definir Rota e Imprimir Ficha)</h3>
+    <p>Logo após dar entrada no lote, você é levado para a tela <strong>Fila & Triagem</strong>:</p>
+    <ul>
+        <li><strong>📋 Botão "Ficha Física":</strong> Clique neste botão para visualizar e imprimir a folha de acompanhamento físico que vai presa junto ao lote na oficina, contendo código de barras visual e espaços para apontamento manual caso necessário.</li>
+        <li><strong>⚙️ Botão "Definir Rota":</strong> Em cada cabeçote que está com status <span class="badge badge-amber">TRIAGEM</span>, clique em <em>Definir Rota</em>. Marque ou desmarque as etapas pelas quais aquela peça deve passar (Jateamento, Estanqueidade, Faceamento, Lapidação, Montagem, Pintura) e clique em <strong>Salvar Rota e Enviar p/ Lavagem</strong>.</li>
+    </ul>
+
+    <!-- PÁGINA 4: OPERAÇÃO NA OFICINA, QUALIDADE E EXPEDIÇÃO -->
+    <div class="page-break"></div>
+
+    <div class="section-header">
+        <h2>5. Operação nos Setores da Oficina (Bancadas)</h2>
+        <span class="section-tag">Chão de Fábrica</span>
+    </div>
+
+    <p>À medida que uma peça conclui uma etapa, ela aparece automaticamente na fila da etapa seguinte. Veja o que o operador deve fazer em cada posto:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 22%;">Setor / Posto</th>
+                <th style="width: 48%;">O que o Operador Preenche na Tela</th>
+                <th style="width: 30%;">O que Acontece Após Salvar</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>🧼 1. Lavagem</strong></td>
+                <td>Anexa a <strong>Foto da Lavagem</strong>, marca a confirmação de limpeza química e informa o nome do operador.</td>
+                <td>Peça avança automaticamente para o <strong>Jateamento</strong> (ou próxima etapa da rota).</td>
+            </tr>
+            <tr>
+                <td><strong>💨 2. Jateamento</strong></td>
+                <td>Anexa a <strong>Foto do Jateamento</strong>, confirma o jateamento abrasivo e informa o operador.</td>
+                <td>Peça avança para a <strong>Estanqueidade</strong>.</td>
+            </tr>
+            <tr>
+                <td><strong>💧 3. Estanqueidade</strong></td>
+                <td>Informa a <strong>Pressão Aplicada (em Bar)</strong>, anexa a foto do teste, marca o resultado (<strong>Aprovado</strong> ou <strong>Reprovado/Condenado</strong> por trinca) e o operador.</td>
+                <td>Se aprovado, segue para <strong>Faceamento</strong>. Se reprovado, o cabeçote vai para a lista de <span class="badge badge-red">CONDENADOS</span>.</td>
+            </tr>
+            <tr>
+                <td><strong>📐 4. Faceamento</strong></td>
+                <td>Digita a <strong>Medida Inicial (mm)</strong> antes do passe e a <strong>Medida Final (mm)</strong> após a plaina, junto ao nome do operador.</td>
+                <td>Medidas ficam gravadas para o laudo PDF e a peça segue para a <strong>Lapidação</strong>.</td>
+            </tr>
+            <tr>
+                <td><strong>💎 5. Lapidação & Vácuo</strong></td>
+                <td>Seleciona o resultado do teste de vácuo:<br>
+                • <span class="badge badge-green">APR (Aprovado)</span>: Segue adiante.<br>
+                • <span class="badge badge-red">REP (Reprovado)</span>: Na 1ª reprovação a peça permanece no posto com alerta para <strong>Trocar Válvula</strong>. Na 2ª reprovação, alerta para <strong>Trocar Sede</strong>.</td>
+                <td>Quando aprovado no teste de vácuo, avança automaticamente para a <strong>Montagem</strong>.</td>
+            </tr>
+            <tr>
+                <td><strong>🔧 6. Montagem</strong></td>
+                <td>Marca os componentes montados separadamente para <strong>Exaustão</strong> e <strong>Admissão</strong>: <em>Válvula, Sede e Guia</em> + nome do montador.</td>
+                <td>Peça avança para o posto de <strong>Inspeção de Qualidade</strong>.</td>
+            </tr>
+            <tr>
+                <td><strong>🛡️ 7. Qualidade</strong></td>
+                <td>Anexa uma ou várias <strong>Fotos Finais da Qualidade</strong>, escreve observações técnicas, marca <em>Aprovar Cabeçote</em> e <em>Gerar Relatório Individual no Banco</em>.</td>
+                <td>O sistema salva o <strong>Laudo Técnico Individual (PDF)</strong> e envia a peça para a <strong>Pintura</strong>.</td>
+            </tr>
+            <tr>
+                <td><strong>🎨 8. Pintura</strong></td>
+                <td>Anexa a <strong>Foto da Pintura Final</strong>, confirma o acabamento e informa o pintor responsável.</td>
+                <td>Peça recebe status <span class="badge badge-green">PRONTO</span>. Quando todas as peças do lote ficam prontas, o lote é alocado em um Pallet do Almoxarifado!</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3>🚚 5.1. Expedição & Saída de Lotes Prontos</h3>
+    <p>Quando todas as peças de um lote terminam a oficina, o lote aparece na tela <strong>Expedição & Saída</strong> já vinculado a um endereço de Pallet (ex.: <code>ALM-A04</code>):</p>
+    <ol>
+        <li>Para liberar a entrega, clique em <strong>🚚 Registrar Saída</strong> no lote desejado.</li>
+        <li>Tire ou anexe a <strong>Foto do Lote Pronto / Carregamento</strong>.</li>
+        <li>Preencha o <strong>Número da Nota Fiscal de Saída</strong>, a <strong>Placa/Veículo</strong> e o <strong>Nome do Motorista</strong> que está retirando.</li>
+        <li>Ao confirmar, o lote muda para <span class="badge badge-blue">EXPEDIDO</span> e a vaga do pallet no almoxarifado é liberada automaticamente para o próximo lote!</li>
+    </ol>
+
+    <h3>📄 5.2. Central de Relatórios Individuais (PDF para o Cliente)</h3>
+    <p>A qualquer momento — mesmo meses após o serviço — você pode acessar o menu <strong>Relatórios (PDF)</strong>:</p>
+    <ul>
+        <li>Use a barra de busca para pesquisar pelo <strong>Número de Série</strong>, <strong>Nome do Cliente</strong> ou <strong>Código do Lote</strong>.</li>
+        <li>Clique em <strong>📄 Abrir / Imprimir PDF</strong>. O sistema abrirá o documento completo contendo: dados do cliente e lote, tabela de rastreabilidade de todas as etapas com datas e operadores, medidas de pressão e faceamento, checklist de montagem e <strong>todas as fotos tiradas ao longo do processo</strong>.</li>
+        <li>Clique em <strong>🖨️ Imprimir / Salvar como PDF</strong> para gerar o arquivo PDF e encaminhar ao cliente por WhatsApp ou e-mail.</li>
+    </ul>
+
+    <!-- PÁGINA 5: PAINEL ADMINISTRATIVO E PERGUNTAS FREQUENTES -->
+    <div class="page-break"></div>
+
+    <div class="section-header">
+        <h2>6. Painel Administrativo: Cadastros, Acessos e Segurança</h2>
+        <span class="section-tag">Exclusivo Administrador</span>
+    </div>
+
+    <p>Usuários com perfil de <strong>Administrador</strong> contam com o botão destacado <strong>🛡️ Painel Admin & Acessos</strong> no topo da tela e no menu lateral. Nele é possível controlar toda a equipe e a segurança do sistema:</p>
+
+    <div class="grid-2">
+        <div class="card">
+            <h4>➕ Cadastrar Novos Usuários para a Equipe</h4>
+            <p>Clique em <strong>"+ Cadastrar Novo Usuário"</strong>, defina um login (ex.: <code>carlos.lavagem</code>), nome completo, cargo e uma senha forte. Você pode criar contas de Administrador ou de Operador Comum.</p>
+        </div>
+        <div class="card">
+            <h4>🎛️ Definir Permissões por Setor</h4>
+            <p>Para cada operador, marque exatamente quais módulos ele pode acessar. Há botões rápidos como <strong>"Só Oficina"</strong> ou <strong>"Qualidade & Expedição"</strong> para configurar em um clique.</p>
+        </div>
+        <div class="card">
+            <h4>🔓 Desbloqueio de Contas</h4>
+            <p>Se um colaborador errar a senha 5 vezes seguidas, o sistema bloqueia a conta por 15 minutos por segurança. O Administrador pode clicar em <strong>"🔓 Desbloquear"</strong> para liberar o acesso na hora.</p>
+        </div>
+        <div class="card">
+            <h4>💾 Backups e Painel de Segurança</h4>
+            <p>Na parte inferior do Painel Admin, o gestor acompanha as 20 verificações de segurança ativas, a trilha de auditoria de acessos e pode baixar uma cópia completa de <strong>Backup</strong> dos dados com 1 clique.</p>
+        </div>
+    </div>
+
+    <div class="section-header">
+        <h2>7. Dúvidas Rápidas do Dia a Dia (FAQ)</h2>
+        <span class="section-tag">Suporte Operacional</span>
+    </div>
+
+    <div class="callout success">
+        <div class="callout-title">1. O que acontece se um cabeçote for condenado na Estanqueidade (trinca)?</div>
+        Quando o operador marca "Reprovado / Condenado" na Estanqueidade, aquela peça específica sai da linha de produção e recebe o status <strong>CONDENADO</strong>. As demais peças boas do mesmo lote continuam seguindo normalmente até ficarem prontas!
+    </div>
+
+    <div class="callout">
+        <div class="callout-title">2. Posso abrir o sistema em dois computadores ou no celular e computador ao mesmo tempo?</div>
+        Sim! O sistema permite trabalhar com múltiplas abas ou dispositivos simultaneamente sem desconectar sua conta.
+    </div>
+
+    <div class="callout warning">
+        <div class="callout-title">3. Como ocultar da tela lateral uma etapa que nossa oficina não utiliza?</div>
+        Acesse o menu <strong>⚙️ Configurações</strong> (ou clique em "Módulos da Oficina" dentro do Painel Admin) e desative a chave da etapa desejada. Ela ficará oculta do menu lateral, mantendo a tela limpa para a equipe.
+    </div>
+
+    <div style="margin-top: 28px; text-align: center; padding: 14px; background: #0f172a; color: #cbd5e1; border-radius: 8px; font-size: 9pt;">
+        <strong>SCRC — Sistema de Controle de Recondicionamento de Cabeçotes</strong><br>
+        Manual Funcional do Usuário • Documento gerado para orientação operacional da equipe
+    </div>
+
+</body>
+</html>

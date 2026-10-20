@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Manual Técnico de Engenharia de Software & Segurança — SCRC</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 14mm 14mm 16mm 14mm;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+            background: #ffffff;
+            line-height: 1.48;
+            font-size: 9.8pt;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        code, pre {
+            font-family: 'Consolas', 'Courier New', monospace;
+        }
+        code {
+            background: #f1f5f9;
+            color: #0f172a;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 8.8pt;
+            border: 1px solid #e2e8f0;
+        }
+        pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 8.3pt;
+            overflow-x: hidden;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 8px 0 12px 0;
+            border-left: 4px solid #38bdf8;
+            break-inside: avoid;
+        }
+
+        /* Capa Técnica */
+        .cover {
+            min-height: 260mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: linear-gradient(150deg, #020617 0%, #0f172a 55%, #1e293b 100%);
+            color: #f8fafc;
+            padding: 24mm 20mm;
+            border-radius: 12px;
+            border: 2px solid #10b981;
+        }
+        .cover-badge {
+            display: inline-block;
+            background: rgba(16, 185, 129, 0.16);
+            color: #34d399;
+            border: 1px solid #10b981;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 9pt;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+        }
+        .cover h1 {
+            font-size: 25pt;
+            line-height: 1.16;
+            font-weight: 800;
+            color: #ffffff;
+            margin-bottom: 12px;
+        }
+        .cover h2 {
+            font-size: 13pt;
+            font-weight: 400;
+            color: #94a3b8;
+            margin-bottom: 22px;
+        }
+        .tech-specs-box {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-left: 4px solid #10b981;
+            border-radius: 8px;
+            padding: 16px 18px;
+            margin: 14px 0;
+        }
+        .tech-specs-box h3 {
+            color: #34d399;
+            font-size: 10.5pt;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            letter-spacing: 0.6px;
+        }
+        .spec-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 9.2pt;
+        }
+        .spec-item strong {
+            color: #38bdf8;
+            display: block;
+            font-size: 8.5pt;
+            text-transform: uppercase;
+        }
+        .spec-item span {
+            color: #e2e8f0;
+        }
+        .cover-footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            padding-top: 14px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 8.8pt;
+            color: #94a3b8;
+        }
+
+        /* Títulos e Seções */
+        .section-header {
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 6px;
+            margin-top: 14px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .section-header h2 {
+            font-size: 13.5pt;
+            color: #0f172a;
+            font-weight: 800;
+        }
+        .section-tag {
+            background: #0f172a;
+            color: #38bdf8;
+            font-weight: 700;
+            font-size: 8pt;
+            padding: 3px 9px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        h3 {
+            font-size: 11pt;
+            color: #0369a1;
+            margin-top: 10px;
+            margin-bottom: 5px;
+        }
+        p {
+            margin-bottom: 8px;
+            text-align: justify;
+        }
+        ul, ol {
+            margin-left: 18px;
+            margin-bottom: 10px;
+        }
+        li {
+            margin-bottom: 4px;
+        }
+
+        /* Tabelas Técnicas */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0 12px 0;
+            font-size: 8.7pt;
+        }
+        tr {
+            break-inside: avoid;
+        }
+        th {
+            background: #0f172a;
+            color: #ffffff;
+            text-align: left;
+            padding: 6px 8px;
+            font-weight: 700;
+        }
+        td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #cbd5e1;
+            vertical-align: top;
+        }
+        tr:nth-child(even) td {
+            background: #f8fafc;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .card {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 10px 12px;
+            break-inside: avoid;
+        }
+        .card h4 {
+            font-size: 9.8pt;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+        .card p {
+            font-size: 8.8pt;
+            margin-bottom: 0;
+            text-align: left;
+            color: #334155;
+        }
+        .badge-ok {
+            background: #d1fae5;
+            color: #047857;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 7.8pt;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PÁGINA 1: CAPA TÉCNICA -->
+    <div class="cover">
+        <div>
+            <div class="cover-badge">DOCUMENTAÇÃO DE ENGENHARIA DE SOFTWARE & ARQUITETURA DE SEGURANÇA</div>
+            <h1>MANUAL TÉCNICO DO SISTEMA<br>SCRC v3.0</h1>
+            <h2>Arquitetura Full-Stack, Modelagem Relacional, Máquina de Estados, Deploy Serverless e Especificação das 20 Camadas de Segurança Defensiva (OWASP)</h2>
+
+            <div class="tech-specs-box">
+                <h3>Ficha Técnica da Arquitetura</h3>
+                <div class="spec-grid">
+                    <div class="spec-item">
+                        <strong>Linguagens Core</strong>
+                        <span>Python 3.12+ (Backend) • JavaScript ES2022, HTML5, CSS3 (Frontend SPA) • SQL (PostgreSQL 15)</span>
+                    </div>
+                    <div class="spec-item">
+                        <strong>Frameworks & ORM</strong>
+                        <span>FastAPI >= 0.115.0 • SQLAlchemy 2.0 ORM • Pydantic v2 • Uvicorn ASGI</span>
+                    </div>
+                    <div class="spec-item">
+                        <strong>Banco de Dados Produção</strong>
+                        <span>Supabase PostgreSQL (Transaction Pooler IPv4 Supavisor :6543 via driver puro Python pg8000)</span>
+                    </div>
+                    <div class="spec-item">
+                        <strong>Infraestrutura & CI/CD</strong>
+                        <span>Vercel Serverless Functions + GitHub Integration (Deploy Contínuo na branch main)</span>
+                    </div>
+                    <div class="spec-item">
+                        <strong>Criptografia & Autenticação</strong>
+                        <span>PBKDF2-HMAC-SHA256 (200k iter) • Sessões HMAC-SHA256 • Cifra CTR-HMAC-SHA256 (Encrypt-then-MAC)</span>
+                    </div>
+                    <div class="spec-item">
+                        <strong>Postura de Segurança</strong>
+                        <span>20/20 Controles Ativos (RLS PostgreSQL, CSP, HSTS, RBAC, Rate Limit 3 Níveis, Anti-CSRF, Anti-XSS)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="cover-footer">
+            <div>
+                <strong>Repositório Oficial:</strong> github.com/jeanjsj-beep/controle-cabecotes<br>
+                <strong>URL de Produção:</strong> https://controle-cabecotes-hpef.vercel.app
+            </div>
+            <div style="text-align: right;">
+                <strong>Público-Alvo:</strong> Engenheiros de Software, Arquitetos e DevSecOps<br>
+                <strong>Versão da Especificação:</strong> 3.0.0
+            </div>
+        </div>
+    </div>
+
+    <!-- PÁGINA 2: STACK TECNOLÓGICA, LINGUAGENS E ARQUITETURA DE DIRETÓRIOS -->
+    <div class="page-break"></div>
+
+    <div class="section-header">
+        <h2>1. Stack Tecnológica e Linguagens Utilizadas</h2>
+        <span class="section-tag">Arquitetura de Software</span>
+    </div>
+
+    <p>
+        O sistema <strong>SCRC</strong> foi projetado sob uma arquitetura <strong>Full-Stack Stateless Serverless-First</strong>, desacoplando a interface SPA (Single Page Application) da API RESTful em Python através de contratos JSON validados por schemas estritos. Essa escolha garante zero dependência de disco efêmero em nuvem e baixa latência tanto em redes locais quanto em execução distribuída na Vercel.
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 20%;">Camada</th>
+                <th style="width: 26%;">Linguagem / Tecnologia</th>
+                <th style="width: 54%;">Papel Arquitetural e Justificativa de Engenharia</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Backend API</strong></td>
+                <td><code>Python 3.12+</code><br><code>FastAPI >= 0.115.0</code></td>
+                <td>Framework ASGI de alta performance baseado em Starlette, com injeção de dependências nativa (usada para sessões de banco e RBAC) e serialização assíncrona.</td>
+            </tr>
+            <tr>
+                <td><strong>Validação de Dados</strong></td>
+                <td><code>Pydantic v2 >= 2.9.0</code></td>
+                <td>Validação estrita de payloads de entrada/saída em Rust-core, prevenindo <em>Mass Assignment</em>, coerção indevida de tipos e payloads malformados.</td>
+            </tr>
+            <tr>
+                <td><strong>ORM & Persistência</strong></td>
+                <td><code>SQLAlchemy >= 2.0.35</code></td>
+                <td>Mapeamento Objeto-Relacional com queries 100% parametrizadas (proteção nativa contra SQL Injection) e suporte híbrido PostgreSQL / SQLite.</td>
+            </tr>
+            <tr>
+                <td><strong>Driver de Banco</strong></td>
+                <td><code>pg8000 >= 1.31.2</code><br><code>psycopg2-binary >= 2.9.9</code></td>
+                <td>O driver <code>pg8000</code> (100% puro Python) garante compatibilidade total em containers AWS Lambda / Vercel Linux sem depender de bibliotecas C dinâmicas (<code>libpq</code>).</td>
+            </tr>
+            <tr>
+                <td><strong>Banco em Nuvem</strong></td>
+                <td><code>Supabase PostgreSQL 15</code></td>
+                <td>Banco relacional gerenciado com <strong>RLS (Row-Level Security)</strong> ativado nas 8 tabelas e conexão via Pooler IPv4 Supavisor (porta <code>6543</code>).</td>
+            </tr>
+            <tr>
+                <td><strong>Frontend SPA</strong></td>
+                <td><code>JavaScript ES2022</code><br><code>HTML5 + CSS3</code></td>
+                <td>Aplicação SPA sem sobrecarga de bundlers pesados. Inclui interceptador global de <code>window.fetch</code>, compressão client-side de fotos via <code>&lt;canvas&gt;</code> e layout responsivo mobile/desktop.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="section-header">
+        <h2>2. Estrutura de Diretórios e Engenharia Serverless</h2>
+        <span class="section-tag">Organização do Código</span>
+    </div>
+
+    <pre>controle_cabecotes/
+├── vercel.json                      # Roteamento Serverless para Vercel (@vercel/python)
+├── requirements.txt                 # Dependências fixadas com versões seguras
+├── backend/
+│   ├── app/
+│   │   ├── main.py                  # Ponto de entrada FastAPI, Middlewares OWASP, Upload e Arquivos Estáticos
+│   │   ├── database.py              # Engine SQLAlchemy, normalização pg8000/Pooler IPv4 e Auto-Migration
+│   │   ├── models.py                # 8 Modelos ORM (Tabelas relacionais PostgreSQL/SQLite)
+│   │   ├── schemas.py               # Contratos Pydantic v2 (Inputs/Outputs)
+│   │   └── routers/
+│   │       ├── auth.py              # Autenticação PBKDF2, Sessões HMAC, RBAC, RLS, Cifra CTR-HMAC, Backup e Auditoria
+│   │       ├── clientes.py          # CRUD de Clientes
+│   │       ├── lotes.py             # Entrada unificada de Lotes, Recebimento Físico e Expedição/Pallets
+│   │       ├── cabecotes.py         # Listagem de Cabeçotes e Definição de Rota (Checklist de Triagem)
+│   │       ├── etapas.py            # Máquina de Estados das 8 Etapas da Oficina e Gerador de Laudo Técnico JSON/PDF
+│   │       └── dashboard.py         # Cálculo de OEE, SLA, Monitor de Gargalos e Ocupação de Pallets
+└── frontend/
+    ├── index.html                   # Estrutura SPA (14 telas operacionais + Painel Admin & 20 Checks + Modais)
+    ├── styles.css                   # Design System Glassmorphism, Responsividade Mobile (<768px) e @media print
+    └── app.js                       # Lógica de Estado, Fetch Interceptor (Bearer + CSRF), Compressão de Fotos e RBAC UI</pre>
+
+    <h3>2.1. Soluções de Engenharia para Ambientes Serverless (Vercel + Supabase)</h3>
+    <ul>
+        <li><strong>Normalização Automática de <code>DATABASE_URL</code> em <code>database.py</code>:</strong> Como funções Serverless na Vercel operam em rede IPv4 e o host direto do Supabase (<code>db.&lt;ref&gt;.supabase.co:5432</code>) utiliza IPv6 exclusivo, o módulo <code>database.py</code> reescreve automaticamente conexões diretas para o <strong>Supabase Transaction Pooler IPv4</strong> (<code>aws-1-sa-east-1.pooler.supabase.com:6543</code> com usuário <code>postgres.&lt;ref&gt;</code>) e converte o dialeto para <code>postgresql+pg8000://</code> com <code>NullPool</code>.</li>
+        <li><strong>Armazenamento de Fotos no Próprio Banco (Stateless Storage):</strong> Em ambientes Serverless o sistema de arquivos local é efêmero e somente-leitura. Por isso, o endpoint <code>POST /api/upload-foto</code> armazena o binário validado diretamente na tabela <code>fotos_armazenadas</code> (em Base64) e o serve com cache imutável em <code>GET /uploads/{filename}</code>.</li>
+    </ul>
+
+    <!-- PÁGINA 3: MODELAGEM DE DADOS E MÁQUINA DE ESTADOS -->
+    <div class="page-break"></div>
+
+    <div class="section-header">
+        <h2>3. Modelagem do Banco de Dados Relacional (8 Tabelas)</h2>
+        <span class="section-tag">Schema PostgreSQL</span>
+    </div>
+
+    <p>O schema relacional é definido em <code>backend/app/models.py</code> e sincronizado automaticamente no boot por <code>Base.metadata.create_all()</code> combinado com migrações incrementais seguras (<code>ALTER TABLE ... ADD COLUMN</code>) em <code>check_and_migrate_db()</code>:</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 22%;">Tabela</th>
+                <th style="width: 33%;">Colunas Chave</th>
+                <th style="width: 45%;">Responsabilidade no Domínio</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>usuarios</code></td>
+                <td><code>id (PK)</code>, <code>username (UQ)</code>, <code>senha_hash</code>, <code>senha_salt</code>, <code>is_admin</code>, <code>permissoes_json</code>, <code>tentativas_falhas</code>, <code>bloqueado_ate</code></td>
+                <td>Credenciais de acesso com hash PBKDF2, matriz de permissões RBAC serializada em JSON e controle de bloqueio anti-força bruta.</td>
+            </tr>
+            <tr>
+                <td><code>clientes</code></td>
+                <td><code>id (PK)</code>, <code>nome</code>, <code>cnpj</code>, <code>inscricao_estadual</code>, <code>email</code>, <code>telefone</code></td>
+                <td>Cadastro fiscal e comercial dos proprietários dos lotes de cabeçotes.</td>
+            </tr>
+            <tr>
+                <td><code>lotes</code></td>
+                <td><code>id (PK)</code>, <code>codigo_lote (UQ)</code>, <code>cliente_id (FK)</code>, <code>status</code>, <code>local_alocacao</code>, <code>expedicao_nf_retorno</code>, <code>expedicao_motorista</code></td>
+                <td>Agrupador logístico das peças. Gerencia o ciclo macro (<code>RECEBIDO</code>, <code>EM_PROCESSAMENTO</code>, <code>CONCLUIDO</code>, <code>EXPEDIDO</code>) e o endereço de pallet (<code>ALM-A/B</code>).</td>
+            </tr>
+            <tr>
+                <td><code>cabecotes</code></td>
+                <td><code>id (PK)</code>, <code>numero_serie (UQ)</code>, <code>lote_id (FK)</code>, <code>status_etapa</code>, <code>requer_*</code>, <code>estanqueidade_pressao</code>, <code>faceamento_medida_*</code>, <code>relatorio_individual_json</code></td>
+                <td>Entidade central de rastreabilidade unitária. Guarda as flags de rota da triagem, métricas dimensionais de cada posto, fotos e o JSON completo do Relatório Técnico Individual.</td>
+            </tr>
+            <tr>
+                <td><code>movimentacoes</code></td>
+                <td><code>id (PK)</code>, <code>cabecote_id (FK)</code>, <code>etapa</code>, <code>operador</code>, <code>data_inicio</code>, <code>data_fim</code>, <code>resultado</code>, <code>observacoes</code></td>
+                <td>Log histórico de apontamentos de chão de fábrica por peça, usado para cálculo de lead-time, gargalos e emissão do laudo técnico.</td>
+            </tr>
+            <tr>
+                <td><code>fotos_armazenadas</code></td>
+                <td><code>nome_arquivo (PK)</code>, <code>mime_type</code>, <code>conteudo_base64</code>, <code>criado_em</code></td>
+                <td>Persistência binária em banco das evidências fotográficas capturadas nas etapas operacionais.</td>
+            </tr>
+            <tr>
+                <td><code>auditoria_seguranca</code></td>
+                <td><code>id (PK)</code>, <code>data_hora</code>, <code>evento</code>, <code>severidade</code>, <code>usuario</code>, <code>ip_origem</code>, <code>detalhes</code></td>
+                <td>Trilha de auditoria imutável (SIEM interno) para logins, falhas, bloqueios, alterações de permissão, rate limits e backups.</td>
+            </tr>
+            <tr>
+                <td><code>backups_automaticos</code></td>
+                <td><code>id (PK)</code>, <code>criado_em</code>, <code>tipo</code>, <code>autor</code>, <code>sha256_checksum</code>, <code>payload_criptografado</code></td>
+                <td>Armazena snapshots completos do banco cifrados com <code>CTR-HMAC-SHA256</code> e verificados por hash de integridade <code>SHA-256</code>.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="section-header">
+        <h2>4. Máquina de Estados Finitos (FSM) e Regras de Negócio</h2>
+        <span class="section-tag">Regras de Domínio</span>
+    </div>
+
+    <h3>4.1. Roteamento Dinâmico de Etapas (<code>avancar_proxima_etapa</code>)</h3>
+    <p>Em <code>backend/app/routers/etapas.py</code>, a transição entre postos não é rígida; ela consulta os atributos booleanos <code>requer_*</code> configurados na Triagem do cabeçote. A ordem canônica avaliada é:</p>
+    <pre>ORDEM_ETAPAS = [
+    ("LAVAGEM",       True),                        # Sempre executada após a Triagem
+    ("JATEAMENTO",    cab.requer_jateamento),
+    ("ESTANQUEIDADE", cab.requer_estanqueidade),
+    ("FACEAMENTO",    cab.requer_faceamento),
+    ("LAPIDACAO",     cab.requer_lapidacao),
+    ("MONTAGEM",      cab.requer_montagem),
+    ("QUALIDADE",     cab.requer_qualidade),        # Gera e persiste o Relatório Individual JSON/PDF
+    ("PINTURA",       cab.requer_pintura),
+] -> Finaliza em "PRONTO" (ou "CONDENADO" se reprovar na Estanqueidade)</pre>
+
+    <h3>4.2. Regra de Retrabalho em 2 Níveis na Lapidação & Vácuo</h3>
+    <ul>
+        <li><strong>Aprovação (<code>APR</code>):</strong> Limpa o status de retrabalho e avança a peça para <code>MONTAGEM</code>.</li>
+        <li><strong>1ª Reprovação no Vácuo (<code>REP</code> com <code>tentativas == 1</code>):</strong> Mantém o cabeçote na etapa <code>LAPIDACAO</code> e define <code>lapidacao_status_retrabalho = "TROCAR_VALVULA"</code>.</li>
+        <li><strong>2ª+ Reprovação no Vácuo (<code>REP</code> com <code>tentativas >= 2</code>):</strong> Mantém o cabeçote em <code>LAPIDACAO</code> e escala a exigência para <code>lapidacao_status_retrabalho = "TROCAR_SEDE"</code>.</li>
+    </ul>
+
+    <!-- PÁGINA 4: AS 20 VERIFICAÇÕES DE SEGURANÇA IMPLEMENTADAS -->
+    <div class="page-break"></div>
+
+    <div class="section-header">
+        <h2>5. Arquitetura de Segurança: Especificação das 20 Verificações</h2>
+        <span class="section-tag">DevSecOps & OWASP</span>
+    </div>
+
+    <p>O sistema implementa 20 camadas de proteção ativa no backend (<code>main.py</code> e <code>routers/auth.py</code>), no banco de dados (Supabase PostgreSQL) e no cliente SPA (<code>app.js</code>):</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 5%;">#</th>
+                <th style="width: 23%;">Controle de Segurança</th>
+                <th style="width: 72%;">Implementação Técnica e Mecanismo de Proteção</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>01</strong></td>
+                <td><strong>HTTPS & HSTS</strong></td>
+                <td>Middleware inspeciona <code>X-Forwarded-Proto</code> em produção e força redirecionamento <code>307 Temporary Redirect</code> para <code>https://</code>, além de injetar <code>Strict-Transport-Security: max-age=63072000; includeSubDomains; preload</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>02</strong></td>
+                <td><strong>CORS Restrito</strong></td>
+                <td><code>CORSMiddleware</code> configurado com lista explícita de origens confiáveis (produção Vercel, localhost e <code>SCRC_CORS_ORIGINS</code>), restringindo métodos e cabeçalhos permitidos.</td>
+            </tr>
+            <tr>
+                <td><strong>03</strong></td>
+                <td><strong>Senhas com Hash</strong></td>
+                <td>Derivação <code>hashlib.pbkdf2_hmac('sha256', password, salt, 200000)</code> com salt aleatório de 16 bytes (128 bits) por usuário e verificação em tempo constante via <code>hmac.compare_digest()</code>. Política exige 8+ caracteres, maiúscula, minúscula, dígito e símbolo.</td>
+            </tr>
+            <tr>
+                <td><strong>04</strong></td>
+                <td><strong>Cookies Seguros</strong></td>
+                <td>No login, o servidor emite o cookie <code>scrc_session</code> com flags <code>HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=86400</code>, impedindo leitura via JavaScript malicioso.</td>
+            </tr>
+            <tr>
+                <td><strong>05</strong></td>
+                <td><strong>Proteção de Secrets</strong></td>
+                <td>Chaves de assinatura e criptografia derivadas via KDF (PBKDF2) a partir de variáveis de ambiente (<code>SCRC_AUTH_SECRET</code>, <code>SCRC_ENCRYPTION_KEY</code>). Documentação <code>/docs</code>, <code>/redoc</code> e <code>/openapi.json</code> desativadas por padrão em produção.</td>
+            </tr>
+            <tr>
+                <td><strong>06</strong></td>
+                <td><strong>Controle de Acesso (RBAC)</strong></td>
+                <td>Dependências FastAPI <code>requer_permissao(modulo)</code> e <code>requer_admin</code> aplicadas em todas as rotas de negócio. Tentativas de acesso sem permissão geram HTTP 403 e alerta na tabela <code>auditoria_seguranca</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>07</strong></td>
+                <td><strong>Gestão de Sessões</strong></td>
+                <td>Tokens stateless assinados no formato <code>s2.&lt;uid&gt;.&lt;token_version&gt;.&lt;exp&gt;.&lt;nonce&gt;.&lt;hmac_sig&gt;</code> transmitidos exclusivamente via cookies <code>HttpOnly; Secure; SameSite=Strict</code> (sem armazenamento em LocalStorage/SessionStorage), controle de versão de sessão (<code>token_version</code>) para revogação instantânea em logout e política de troca obrigatória de senha (<code>must_change_password</code>).</td>
+            </tr>
+            <tr>
+                <td><strong>08</strong></td>
+                <td><strong>RLS (Row-Level Security)</strong></td>
+                <td>Função <code>aplicar_rls_postgresql()</code> executa <code>ALTER TABLE public.&lt;t&gt; ENABLE ROW LEVEL SECURITY</code> e <code>REVOKE ALL ON TABLE public.&lt;t&gt; FROM anon, authenticated</code> nas 8 tabelas do Supabase, bloqueando acesso direto pela API PostgREST pública.</td>
+            </tr>
+            <tr>
+                <td><strong>09</strong></td>
+                <td><strong>Rate Limits (3 Níveis)</strong></td>
+                <td>Controle por IP em janela deslizante: <strong>Login</strong> (máx. 15 req/min), <strong>Uploads</strong> (máx. 20 req/min) e <strong>API Global</strong> (máx. 120 req/min), retornando <code>HTTP 429</code> + bloqueio de conta por 15 min após 5 falhas de senha.</td>
+            </tr>
+            <tr>
+                <td><strong>10</strong></td>
+                <td><strong>Validação de Inputs</strong></td>
+                <td>Schemas Pydantic v2 estritos combinados com validação de <code>Content-Length</code> no middleware (bloqueio automático <code>HTTP 413</code> acima de 15 MB).</td>
+            </tr>
+            <tr>
+                <td><strong>11</strong></td>
+                <td><strong>Anti-SQL Injection</strong></td>
+                <td>Uso exclusivo de queries parametrizadas do SQLAlchemy ORM em todos os routers. Nenhum input de usuário é concatenado em strings SQL.</td>
+            </tr>
+            <tr>
+                <td><strong>12</strong></td>
+                <td><strong>Proteção Anti-XSS</strong></td>
+                <td>Sanitização server-side via <code>sanitizar_texto_seguro()</code> (remoção de tags HTML, caracteres de controle e atributos <code>javascript:/on*=</code>) + função <code>escapeHtml()</code> no frontend + cabeçalho <code>Content-Security-Policy</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>13</strong></td>
+                <td><strong>Proteção Anti-CSRF</strong></td>
+                <td>Defesa em profundidade: cookies <code>SameSite=Strict</code> + validação de igualdade entre cabeçalho <code>Origin</code> e <code>Host</code> em métodos <code>POST/PUT/DELETE/PATCH</code> + envio automático de <code>X-Requested-With: XMLHttpRequest</code> e <code>X-CSRF-Token</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>14</strong></td>
+                <td><strong>Security Headers</strong></td>
+                <td>Injeção global de <code>Content-Security-Policy</code>, <code>Strict-Transport-Security</code>, <code>X-Frame-Options: DENY</code>, <code>X-Content-Type-Options: nosniff</code>, <code>Referrer-Policy</code>, <code>Permissions-Policy</code> e <code>Cross-Origin-Opener-Policy: same-origin</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>15</strong></td>
+                <td><strong>Uploads Seguros</strong></td>
+                <td>Inspeção dos <strong>Magic Bytes</strong> reais do binário decodificado (assinaturas <code>\xFF\xD8\xFF</code> JPEG, <code>\x89PNG</code>, <code>RIFF..WEBP</code>, <code>GIF8</code>), teto de 10 MB, renomeação com UUIDv4 e entrega com <code>nosniff</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>16</strong></td>
+                <td><strong>Tratamento de Erros</strong></td>
+                <td>Handler global <code>@app.exception_handler(Exception)</code> que captura falhas inesperadas, grava o erro internamente com um <code>trace_id</code> único e retorna mensagem genérica segura sem expor stack traces.</td>
+            </tr>
+            <tr>
+                <td><strong>17</strong></td>
+                <td><strong>Criptografia de Dados</strong></td>
+                <td>Implementação de cifra de fluxo autenticada <strong>CTR-HMAC-SHA256 (Encrypt-then-MAC)</strong> com IV aleatório de 128 bits (formato <code>enc1.&lt;base64&gt;.&lt;hmac&gt;</code>) para proteger snapshots em repouso + TLS 1.3 em trânsito.</td>
+            </tr>
+            <tr>
+                <td><strong>18</strong></td>
+                <td><strong>Dependências Seguras</strong></td>
+                <td>Versões mínimas seguras fixadas em <code>requirements.txt</code> e eliminação de pacotes legados desnecessários.</td>
+            </tr>
+            <tr>
+                <td><strong>19</strong></td>
+                <td><strong>Backup Automático</strong></td>
+                <td>Geração automática diária (janela de 24h) de snapshot completo criptografado na tabela <code>backups_automaticos</code> + endpoints para geração manual e exportação de stream binário seguro no formato <code>.scrcbak</code> com autenticação HMAC e hash <code>SHA-256</code>.</td>
+            </tr>
+            <tr>
+                <td><strong>20</strong></td>
+                <td><strong>Monitoramento & Auditoria Dinâmica</strong></td>
+                <td>Auditoria dinâmica em tempo real (avaliando HTTPS, CORS, secrets, RLS, backups e headers) exposta em <code>GET /api/seguranca/painel</code>, acompanhada de telemetria contínua de eventos classificados por severidade (<code>INFO</code>, <code>WARN</code>, <code>CRITICAL</code>).</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- PÁGINA 5: CATÁLOGO DE ENDPOINTS E OPERAÇÃO DE DEPLOY -->
+    <div class="page-break"></div>
+
+    <div class="section-header">
+        <h2>6. Catálogo de Endpoints da API RESTful</h2>
+        <span class="section-tag">Referência da API</span>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 12%;">Método</th>
+                <th style="width: 34%;">Rota</th>
+                <th style="width: 22%;">Permissão Exigida</th>
+                <th style="width: 32%;">Descrição Técnica</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td><code>POST</code></td><td><code>/api/auth/login</code></td><td>Público (Rate Limited)</td><td>Autentica usuário, emite token HMAC e cookies HttpOnly.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/auth/logout</code></td><td>Autenticado</td><td>Encerra sessão e limpa cookies seguros.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/auth/me</code></td><td>Autenticado</td><td>Retorna perfil e permissões do usuário logado.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/auth/alterar-senha</code></td><td>Autenticado</td><td>Altera a própria senha validando os 5 critérios de força.</td></tr>
+            <tr><td><code>GET/POST</code></td><td><code>/api/usuarios</code></td><td>Admin (<code>requer_admin</code>)</td><td>Lista todos os usuários ou cria novo operador/admin.</td></tr>
+            <tr><td><code>PUT/DEL</code></td><td><code>/api/usuarios/{id}</code></td><td>Admin (<code>requer_admin</code>)</td><td>Atualiza permissões/senha, desbloqueia ou remove conta.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/seguranca/painel</code></td><td>Admin (<code>requer_admin</code>)</td><td>Diagnóstico das 20 verificações, RLS, logs e backups.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/seguranca/backup</code></td><td>Admin (<code>requer_admin</code>)</td><td>Gera snapshot criptografado (CTR-HMAC-SHA256) imediato.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/seguranca/backup/exportar</code></td><td>Admin (<code>requer_admin</code>)</td><td>Exporta arquivo JSON completo com checksum SHA-256.</td></tr>
+            <tr><td><code>GET/POST</code></td><td><code>/api/clientes</code></td><td><code>entrada</code> / <code>recebimento</code></td><td>Lista e cadastra clientes.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/lotes/entrada</code></td><td><code>entrada</code></td><td>Cria lote (e cliente opcional) gerando os cabeçotes em <code>TRIAGEM</code>.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/lotes</code> e <code>/api/lotes/{id}</code></td><td>Autenticado</td><td>Consulta lotes, peças vinculadas e rastreabilidade.</td></tr>
+            <tr><td><code>PUT</code></td><td><code>/api/cabecotes/{id}/checklist</code></td><td><code>recebimento</code></td><td>Salva flags de rota da peça e envia para <code>LAVAGEM</code>.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/etapas/{id}/&lt;etapa&gt;</code></td><td>Permissão da Etapa</td><td>Registra apontamento de Lavagem, Jateamento, Estanqueidade, Faceamento, Lapidação, Montagem, Qualidade ou Pintura.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/etapas/relatorios/lista</code></td><td><code>relatorios</code> / <code>qualidade</code></td><td>Lista todos os cabeçotes com status do laudo técnico.</td></tr>
+            <tr><td><code>GET</code></td><td><code>/api/etapas/{id}/relatorio-individual</code></td><td><code>relatorios</code> / <code>qualidade</code></td><td>Retorna (ou constrói) o JSON completo do Relatório PDF.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/lotes/{id}/expedir</code></td><td><code>expedicao</code></td><td>Registra saída com foto, NF, veículo, motorista e libera pallet.</td></tr>
+            <tr><td><code>POST</code></td><td><code>/api/upload-foto</code></td><td>Autenticado (Rate Limited)</td><td>Valida Magic Bytes da imagem e salva em <code>fotos_armazenadas</code>.</td></tr>
+        </tbody>
+    </table>
+
+    <div class="section-header">
+        <h2>7. Variáveis de Ambiente, Execução Local e Deploy</h2>
+        <span class="section-tag">DevOps & Operação</span>
+    </div>
+
+    <h3>7.1. Variáveis de Ambiente Suportadas</h3>
+    <ul>
+        <li><code>DATABASE_URL</code>: String de conexão PostgreSQL do Supabase (ex.: <code>postgresql+pg8000://postgres.&lt;ref&gt;:&lt;senha&gt;@aws-1-sa-east-1.pooler.supabase.com:6543/postgres</code>). Se omitida localmente, utiliza SQLite (<code>scrc.db</code>).</li>
+        <li><code>SCRC_AUTH_SECRET</code>: Segredo mestre para derivação da chave HMAC-SHA256 de tokens de sessão.</li>
+        <li><code>SCRC_ENCRYPTION_KEY</code>: Segredo mestre para derivação da chave de criptografia em repouso (CTR-HMAC-SHA256).</li>
+        <li><code>SCRC_CORS_ORIGINS</code>: Lista separada por vírgulas de domínios adicionais autorizados no CORS.</li>
+        <li><code>SCRC_ENABLE_DOCS</code>: Defina como <code>1</code> apenas em ambiente de desenvolvimento caso deseje habilitar <code>/docs</code> (Swagger UI).</li>
+    </ul>
+
+    <h3>7.2. Comandos de Execução e Deploy Contínuo</h3>
+    <pre># 1. Executar servidor localmente (Desenvolvimento)
+cd backend
+.\venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+
+# 2. Deploy em Produção (GitHub -> Vercel)
+git add -A
+git commit -m "chore: atualizacao do sistema"
+git push origin main</pre>
+
+    <div style="margin-top: 18px; text-align: center; padding: 12px; background: #0f172a; color: #cbd5e1; border-radius: 8px; font-size: 8.8pt;">
+        <strong>SCRC — Manual Técnico de Engenharia de Software & Arquitetura de Segurança</strong><br>
+        Especificação Técnica Completa • Python / FastAPI / SQLAlchemy / PostgreSQL / SPA JS
+    </div>
+
+</body>
+</html>

@@ -13,20 +13,43 @@ import json
 
 router = APIRouter(prefix="/api/etapas", tags=["Etapas"], dependencies=[Depends(obter_usuario_atual)])
 
-# Configuração Modular: Lapidação Ativa por padrão
-CONFIG_LAPIDACAO_ATIVA = True
+# Configuração Modular: Lapidação Ativa por padrão, com persistência no banco
+SPACES_ALMOXARIFADO = [
+    f"ALM-A{i:02d}" for i in range(1, 13)
+] + [
+    f"ALM-B{i:02d}" for i in range(1, 13)
+]
+
+def obter_lapidacao_ativa(db: Session) -> bool:
+    try:
+        cfg = db.query(models.Configuracao).filter(models.Configuracao.chave == "lapidacao_ativa").first()
+        if cfg:
+            return cfg.valor.lower() in ("true", "1", "t", "sim")
+    except Exception:
+        pass
+    return True
+
+def definir_lapidacao_ativa(db: Session, ativa: bool):
+    try:
+        cfg = db.query(models.Configuracao).filter(models.Configuracao.chave == "lapidacao_ativa").first()
+        if not cfg:
+            cfg = models.Configuracao(chave="lapidacao_ativa", valor=str(ativa).lower())
+            db.add(cfg)
+        else:
+            cfg.valor = str(ativa).lower()
+        db.commit()
+    except Exception:
+        db.rollback()
 
 @router.get("/config", response_model=Dict[str, bool])
-def obter_configuracao():
-    global CONFIG_LAPIDACAO_ATIVA
-    return {"lapidacao_ativa": CONFIG_LAPIDACAO_ATIVA}
+def obter_configuracao(db: Session = Depends(get_db)):
+    return {"lapidacao_ativa": obter_lapidacao_ativa(db)}
 
 @router.post("/config", response_model=Dict[str, bool], dependencies=[Depends(requer_permissao("configuracoes"))])
-def atualizar_configuracao(config: Dict[str, bool]):
-    global CONFIG_LAPIDACAO_ATIVA
+def atualizar_configuracao(config: Dict[str, bool], db: Session = Depends(get_db)):
     if "lapidacao_ativa" in config:
-        CONFIG_LAPIDACAO_ATIVA = config["lapidacao_ativa"]
-    return {"lapidacao_ativa": CONFIG_LAPIDACAO_ATIVA}
+        definir_lapidacao_ativa(db, bool(config["lapidacao_ativa"]))
+    return {"lapidacao_ativa": obter_lapidacao_ativa(db)}
 
 
 def construir_e_salvar_relatorio(db: Session, cabecote: models.Cabecote) -> Dict[str, Any]:
@@ -145,12 +168,12 @@ def construir_e_salvar_relatorio(db: Session, cabecote: models.Cabecote) -> Dict
     return relatorio
 
 
-def obter_proxima_etapa(cabecote: models.Cabecote, etapa_atual: str) -> str:
+def obter_proxima_etapa(cabecote: models.Cabecote, etapa_atual: str, db: Session = None) -> str:
     """
     Determina a próxima etapa do fluxo de cabeçotes:
     LAVAGEM -> JATEAMENTO -> ESTANQUEIDADE -> FACEAMENTO -> LAPIDACAO -> MONTAGEM -> QUALIDADE -> PINTURA -> PRONTO
     """
-    global CONFIG_LAPIDACAO_ATIVA
+    lap_ativa = obter_lapidacao_ativa(db) if db else True
 
     fluxo = ["LAVAGEM"]
 
@@ -163,7 +186,7 @@ def obter_proxima_etapa(cabecote: models.Cabecote, etapa_atual: str) -> str:
     if cabecote.requer_faceamento:
         fluxo.append("FACEAMENTO")
 
-    if cabecote.requer_lapidacao and CONFIG_LAPIDACAO_ATIVA:
+    if cabecote.requer_lapidacao and lap_ativa:
         fluxo.append("LAPIDACAO")
 
     if cabecote.requer_montagem:
@@ -185,10 +208,23 @@ def obter_proxima_etapa(cabecote: models.Cabecote, etapa_atual: str) -> str:
     return "PRONTO"
 
 
+def alocar_proximo_pallet_livre(db: Session) -> Optional[str]:
+    ocupados = {
+        row[0]
+        for row in db.query(models.Lote.pallet_almoxarifado_final)
+        .filter(models.Lote.pallet_almoxarifado_final.isnot(None), models.Lote.status != "EXPEDIDO")
+        .all()
+    }
+    for space in SPACES_ALMOXARIFADO:
+        if space not in ocupados:
+            return space
+    return None
+
+
 def verificar_fechamento_lote(db: Session, lote_id: int):
     """
     Verifica se todas as peças do lote foram concluídas (PRONTO ou CONDENADO).
-    Se sim, atualiza o status do lote para CONCLUIDO (disponível para Expedição).
+    Se sim, atualiza o status do lote para CONCLUIDO e auto-aloca pallet no almoxarifado.
     """
     lote = db.query(models.Lote).filter(models.Lote.id == lote_id).first()
     if not lote:
@@ -202,11 +238,17 @@ def verificar_fechamento_lote(db: Session, lote_id: int):
 
     if todas_resolvidas and lote.status == "EM_PROCESSO":
         lote.status = "CONCLUIDO"
+        if not lote.pallet_almoxarifado_final:
+            pallet_alocado = alocar_proximo_pallet_livre(db)
+            if pallet_alocado:
+                lote.pallet_almoxarifado_final = pallet_alocado
+
+        pallet_info = f" Alocado no pallet {lote.pallet_almoxarifado_final}." if lote.pallet_almoxarifado_final else ""
         mov = models.Movimentacao(
             lote_id=lote.id,
             estagio_origem="OFICINA",
             estagio_destino="EXPEDICAO",
-            descricao="Todos os cabeçotes do lote foram finalizados (Prontos/Condenados). Lote liberado para Expedição."
+            descricao=f"Todos os cabeçotes do lote foram finalizados (Prontos/Condenados). Lote liberado para Expedição.{pallet_info}"
         )
         db.add(mov)
         db.commit()
@@ -311,8 +353,16 @@ def registrar_estanqueidade(cabecote_id: int, input_data: schemas.EstanqueidadeI
     cabecote.estanqueidade_data = datetime.datetime.utcnow()
     cabecote.estanqueidade_operador = input_data.operador
 
-    prox = obter_proxima_etapa(cabecote, "ESTANQUEIDADE")
-    cabecote.status_etapa = prox
+    if not input_data.aprovada:
+        cabecote.status_etapa = "CONDENADO"
+        prox = "CONDENADO"
+        lote_atual = db.query(models.Lote).filter(models.Lote.id == cabecote.lote_id).first()
+        cliente = lote_atual.cliente_nome if lote_atual else "Desconhecido"
+        msg_mov = f"Cabeçote CONDENADO na Estanqueidade (Vazamento/Trinca sob {input_data.pressao_aplicada} bar/PSI). Reposição solicitada ao cliente {cliente}."
+    else:
+        prox = obter_proxima_etapa(cabecote, "ESTANQUEIDADE", db)
+        cabecote.status_etapa = prox
+        msg_mov = f"Teste de Estanqueidade aprovado. Pressão aplicada: {input_data.pressao_aplicada} bar/PSI."
 
     mov = models.Movimentacao(
         lote_id=cabecote.lote_id,
@@ -320,11 +370,11 @@ def registrar_estanqueidade(cabecote_id: int, input_data: schemas.EstanqueidadeI
         estagio_origem="ESTANQUEIDADE",
         estagio_destino=prox,
         operador=input_data.operador,
-        descricao=f"Teste de Estanqueidade aprovado. Pressão aplicada: {input_data.pressao_aplicada} bar/PSI."
+        descricao=msg_mov
     )
     db.add(mov)
     db.commit()
-    if prox == "PRONTO":
+    if prox in ["PRONTO", "CONDENADO"]:
         verificar_fechamento_lote(db, cabecote.lote_id)
     db.refresh(cabecote)
     return cabecote

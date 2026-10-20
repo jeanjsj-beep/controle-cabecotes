@@ -3,9 +3,14 @@ const API_BASE = window.location.origin + "/api";
 let currentCabecoteId = null;
 let currentLoteId = null;
 
-// Variáveis Globais de Sessão e Autenticação
-let authToken = localStorage.getItem("scrc_auth_token") || sessionStorage.getItem("scrc_auth_token") || null;
+// Variáveis Globais de Sessão e Autenticação (Sessão 100% por Cookie HttpOnly + CSRF)
 let currentUser = null;
+let mandatoryPasswordChange = false;
+
+// Caches em memória para eliminação de interpolação insegura em atributos inline
+const cacheCabecotes = {};
+const cacheLotes = {};
+const cacheUsuarios = {};
 
 // Utilitário Anti-XSS para escapar texto dinâmico inserido via innerHTML (Item 12)
 function escapeHtml(str) {
@@ -18,27 +23,47 @@ function escapeHtml(str) {
         .replace(/'/g, "&#39;");
 }
 
+function urlFotoSegura(url) {
+    if (!url || typeof url !== "string") return "";
+    const clean = url.trim();
+    if (clean.startsWith("/uploads/") && /^(\/uploads\/[A-Za-z0-9_.-]{1,120})$/.test(clean)) {
+        return escapeHtml(clean);
+    }
+    if (clean.startsWith("data:image/") && clean.length < 5_000_000) {
+        return escapeHtml(clean);
+    }
+    return "";
+}
+
 function getCookieValue(name) {
     const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
     return match ? decodeURIComponent(match[2]) : null;
 }
 
-// Interceptador Global de Fetch para anexar Token Bearer, Cookie Seguro HttpOnly, Anti-CSRF e tratar 401/403
+// Interceptador Global de Fetch com Cookie Seguro HttpOnly e Anti-CSRF
 const _originalFetch = window.fetch.bind(window);
 window.fetch = async function(url, options = {}) {
     options.headers = options.headers || {};
-    options.credentials = options.credentials || "same-origin";
+    options.credentials = "same-origin";
     options.headers["X-Requested-With"] = "XMLHttpRequest";
     const csrfCookie = getCookieValue("scrc_csrf");
     if (csrfCookie) {
         options.headers["X-CSRF-Token"] = csrfCookie;
     }
-    if (authToken && typeof url === "string" && url.includes("/api/")) {
-        options.headers["Authorization"] = `Bearer ${authToken}`;
-    }
     const response = await _originalFetch(url, options);
     if (response.status === 401 && typeof url === "string" && !url.includes("/api/auth/login")) {
         forcarLogoutSessao("Sua sessão expirou ou foi encerrada. Faça login novamente.");
+    }
+    if (response.status === 403) {
+        try {
+            const clone = response.clone();
+            const data = await clone.json();
+            if (data && data.detail && data.detail.includes("SENHA_TROCA_OBRIGATORIA")) {
+                exigirTrocaDeSenhaObrigatoria();
+            } else if (data && data.detail) {
+                showToast(data.detail, "error");
+            }
+        } catch (_) {}
     }
     return response;
 };
@@ -90,6 +115,10 @@ function openModal(id) {
 }
 
 function closeModal(id) {
+    if (id === "modal-alterar-senha" && mandatoryPasswordChange) {
+        showToast("A troca de senha é obrigatória antes de continuar utilizando o sistema.", "warning");
+        return;
+    }
     const modal = document.getElementById(id);
     if (modal) modal.classList.remove("active");
 }
@@ -102,7 +131,7 @@ function imprimirElemento(modalId) {
     window.print();
 }
 
-// Toast Notifications
+// Toast Notifications (com proteção Anti-XSS)
 function showToast(msg, type = "success") {
     const wrap = document.getElementById("toast-wrap");
     if (!wrap) return;
@@ -116,7 +145,7 @@ function showToast(msg, type = "success") {
 
     toast.innerHTML = `
         <span>${emoji}</span>
-        <span class="toast-msg">${msg}</span>
+        <span class="toast-msg">${escapeHtml(msg)}</span>
     `;
 
     wrap.appendChild(toast);
@@ -193,9 +222,10 @@ async function handleSinglePhotoUpload(fileInput, hiddenInputId, previewContaine
         const url = await uploadFileToServer(file);
         document.getElementById(hiddenInputId).value = url;
         if (preview) {
+            const safeUrl = urlFotoSegura(url);
             preview.innerHTML = `
                 <div class="uploaded-thumb-wrap">
-                    <img src="${url}" alt="Foto anexada" class="uploaded-thumb">
+                    <img src="${safeUrl}" alt="Foto anexada" class="uploaded-thumb">
                     <span class="badge badge-success">📷 Foto Anexada</span>
                 </div>
             `;
@@ -235,8 +265,8 @@ function renderQualidadePhotosPreview(previewContainerId) {
     }
     preview.innerHTML = uploadedQualidadePhotos.map((url, idx) => `
         <div class="uploaded-thumb-item">
-            <img src="${url}" alt="Foto ${idx + 1}" class="uploaded-thumb">
-            <button type="button" class="btn-remove-photo" onclick="removerFotoQualidade(${idx})">&times;</button>
+            <img src="${urlFotoSegura(url)}" alt="Foto ${Number(idx) + 1}" class="uploaded-thumb">
+            <button type="button" class="btn-remove-photo" onclick="removerFotoQualidade(${Number(idx)})">&times;</button>
         </div>
     `).join("");
 }
@@ -408,10 +438,10 @@ function handleGlobalSearch(query) {
                     item.className = "search-item";
                     item.innerHTML = `
                         <div>
-                            <strong>${l.codigo_lote}</strong> — ${l.cliente_nome}
-                            <div class="text-muted" style="font-size:0.75rem;">NF: ${l.nf_remessa || 'N/A'} | ${l.total_pecas} peça(s)</div>
+                            <strong>${escapeHtml(l.codigo_lote)}</strong> — ${escapeHtml(l.cliente_nome)}
+                            <div class="text-muted" style="font-size:0.75rem;">NF: ${escapeHtml(l.nf_remessa || 'N/A')} | ${Number(l.total_pecas)} peça(s)</div>
                         </div>
-                        <span class="badge badge-info">${l.status}</span>
+                        <span class="badge badge-info">${escapeHtml(l.status)}</span>
                     `;
                     item.onclick = () => {
                         dropdown.classList.add("hidden");
@@ -433,12 +463,12 @@ function handleGlobalSearch(query) {
                     item.className = "search-item";
                     item.innerHTML = `
                         <div>
-                            <strong>${c.numero_serie}</strong>
-                            <div class="text-muted" style="font-size:0.75rem;">Lote: ${c.codigo_lote} (${c.cliente_nome})</div>
+                            <strong>${escapeHtml(c.numero_serie)}</strong>
+                            <div class="text-muted" style="font-size:0.75rem;">Lote: ${escapeHtml(c.codigo_lote)} (${escapeHtml(c.cliente_nome)})</div>
                         </div>
                         <div style="display:flex; gap:6px; align-items:center;">
-                            <span class="badge badge-warning">${c.status_etapa}</span>
-                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); abrirRelatorioIndividualModal(${c.id})">📄 PDF</button>
+                            <span class="badge badge-warning">${escapeHtml(c.status_etapa)}</span>
+                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); abrirRelatorioIndividualModal(${Number(c.id)})">📄 PDF</button>
                         </div>
                     `;
                     item.onclick = () => {
@@ -450,7 +480,7 @@ function handleGlobalSearch(query) {
             }
 
             if (!hasResults) {
-                dropdown.innerHTML = `<div style="padding:12px; color: var(--text-muted); text-align:center;">Nenhum lote ou cabeçote encontrado para "${query}"</div>`;
+                dropdown.innerHTML = `<div style="padding:12px; color: var(--text-muted); text-align:center;">Nenhum lote ou cabeçote encontrado para "${escapeHtml(query)}"</div>`;
             }
 
             dropdown.classList.remove("hidden");
@@ -487,12 +517,25 @@ async function fetchStats() {
         }
         document.getElementById("sla-badge-no-prazo").innerText = `Prazo Geral de SLA Ok`;
 
-        const mainGargalo = data.posto_gargalo || "FACEAMENTO";
-        const horGargalo = data.gargalos_tempo_medio_horas[mainGargalo] || 4.5;
+        const mainGargalo = data.posto_gargalo || "Sem gargalos";
+        const filaGargalo = (data.gargalos_fila && data.gargalos_fila[mainGargalo]) || 0;
+        const horGargalo = (data.gargalos_tempo_medio_horas && data.gargalos_tempo_medio_horas[mainGargalo]) || 0;
         const mainTitle = document.getElementById("bottleneck-main-title");
         const mainDesc = document.getElementById("bottleneck-main-desc");
-        if (mainTitle) mainTitle.innerText = `Gargalo Crítico: ${ROOM_CONFIGS[mainGargalo]?.title || mainGargalo}`;
-        if (mainDesc) mainDesc.innerText = `Retenção física estimada em ~${horGargalo.toFixed(1)}h por cabeçote neste posto.`;
+        if (mainTitle) {
+            if (mainGargalo === "Sem gargalos" || (filaGargalo === 0 && horGargalo === 0)) {
+                mainTitle.innerText = "Monitor de Gargalos: Fluxo Estável";
+            } else {
+                mainTitle.innerText = `Gargalo Atual: ${ROOM_CONFIGS[mainGargalo]?.title || mainGargalo}`;
+            }
+        }
+        if (mainDesc) {
+            if (mainGargalo === "Sem gargalos" || (filaGargalo === 0 && horGargalo === 0)) {
+                mainDesc.innerText = "Sem gargalos no momento. Todas as etapas estão operando com fluxo regular.";
+            } else {
+                mainDesc.innerText = `${filaGargalo} peça(s) na fila · retenção média histórica ${horGargalo.toFixed(1)}h.`;
+            }
+        }
 
         const lotesProcesso = (data.status_lotes.RECEBIDO || 0) + (data.status_lotes.EM_PROCESSO || 0);
         document.getElementById("kpi-lotes-ativos").innerText = lotesProcesso;
@@ -521,7 +564,7 @@ async function fetchStats() {
             div.className = "alert alert-warning";
             div.innerHTML = `
                 <div>
-                    <strong>⚠️ Alerta de Reposição de Lote:</strong> ${alert.mensagem}
+                    <strong>⚠️ Alerta de Reposição de Lote:</strong> ${escapeHtml(alert.mensagem)}
                 </div>
                 <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="navigate('recebimento')">Ir para Triagem</button>
             `;
@@ -536,12 +579,12 @@ async function fetchStats() {
             data.ultimas_movimentacoes.forEach(m => {
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
-                    <td>${m.data_hora}</td>
-                    <td><span class="badge badge-info">${m.lote_codigo}</span></td>
-                    <td><strong>${m.cabecote_serial}</strong></td>
-                    <td><span class="badge badge-warning">${m.estagio_origem}</span> ➔ <span class="badge badge-success">${m.estagio_destino}</span></td>
-                    <td><strong>${m.operador}</strong></td>
-                    <td class="text-muted">${m.descricao}</td>
+                    <td>${escapeHtml(m.data_hora)}</td>
+                    <td><span class="badge badge-info">${escapeHtml(m.lote_codigo)}</span></td>
+                    <td><strong>${escapeHtml(m.cabecote_serial)}</strong></td>
+                    <td><span class="badge badge-warning">${escapeHtml(m.estagio_origem)}</span> ➔ <span class="badge badge-success">${escapeHtml(m.estagio_destino)}</span></td>
+                    <td><strong>${escapeHtml(m.operador)}</strong></td>
+                    <td class="text-muted">${escapeHtml(m.descricao)}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -647,13 +690,13 @@ async function openSalaModal(etapaKey) {
             const paramsStr = params.length > 0 ? params.join(" | ") : "Aguardando processamento do posto";
 
             tr.innerHTML = `
-                <td><strong>${p.numero_serie}</strong></td>
-                <td><span class="badge badge-purple">${p.numero_identificacao_peca || 'N/A'}</span></td>
-                <td><span class="badge badge-info">${p.codigo_lote}</span></td>
-                <td><strong>${p.cliente_nome}</strong></td>
-                <td style="font-size: 0.8rem; color: var(--text-secondary);">${paramsStr}</td>
+                <td><strong>${escapeHtml(p.numero_serie)}</strong></td>
+                <td><span class="badge badge-purple">${escapeHtml(p.numero_identificacao_peca || 'N/A')}</span></td>
+                <td><span class="badge badge-info">${escapeHtml(p.codigo_lote)}</span></td>
+                <td><strong>${escapeHtml(p.cliente_nome)}</strong></td>
+                <td style="font-size: 0.8rem; color: var(--text-secondary);">${escapeHtml(paramsStr)}</td>
                 <td>
-                    <button class="btn btn-secondary btn-sm" onclick="abrirRelatorioIndividualModal(${p.id})">📄 Relatório PDF</button>
+                    <button class="btn btn-secondary btn-sm" onclick="abrirRelatorioIndividualModal(${Number(p.id)})">📄 Relatório PDF</button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -685,7 +728,7 @@ function renderPalletGrid(palletsList, occupancyPct) {
         item.title = isOccupied ? `Pallet ${p.codigo}: Lote ${p.lote_codigo} (${p.cliente_nome}) - ${p.total_pecas} pçs` : `Pallet ${p.codigo}: Livre`;
 
         item.innerHTML = `
-            <span class="pallet-code">${p.codigo}</span>
+            <span class="pallet-code">${escapeHtml(p.codigo)}</span>
             <span class="pallet-status-dot"></span>
         `;
 
@@ -716,10 +759,10 @@ function renderSlaTable(slaList) {
         const badgeClass = s.porcentagem_sla >= 90 ? "badge-success" : s.porcentagem_sla >= 75 ? "badge-warning" : "badge-danger";
 
         tr.innerHTML = `
-            <td><strong>${s.cliente_nome}</strong></td>
-            <td>${s.total_lotes} lote(s)</td>
-            <td>${s.no_prazo} no prazo</td>
-            <td><span class="badge ${badgeClass}">${s.porcentagem_sla}% SLA</span></td>
+            <td><strong>${escapeHtml(s.cliente_nome)}</strong></td>
+            <td>${Number(s.total_lotes)} lote(s)</td>
+            <td>${Number(s.no_prazo)} no prazo</td>
+            <td><span class="badge ${badgeClass}">${Number(s.porcentagem_sla)}% SLA</span></td>
         `;
         tbody.appendChild(tr);
     });
@@ -798,7 +841,7 @@ function gerarCamposIdentificacao(qtd) {
         div.style.marginBottom = "8px";
         div.innerHTML = `
             <label style="font-size: 0.75rem; color: var(--accent-light); margin-bottom: 2px;">Peça #${i + 1} - Nº Identificação</label>
-            <input type="text" class="input-identificacao-peca form-control" placeholder="Ex: P-${1000 + i + 1}" value="${val}" required style="padding: 6px 10px; font-size: 0.85rem;">
+            <input type="text" class="input-identificacao-peca form-control" maxlength="60" placeholder="Ex: P-${1000 + i + 1}" value="${escapeHtml(val)}" required style="padding: 6px 10px; font-size: 0.85rem;">
         `;
         container.appendChild(div);
     }
@@ -883,14 +926,15 @@ async function loadRecebimento() {
             tbodyPre.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhum lote pendente de chegada física.</td></tr>`;
         } else {
             preLotes.forEach(l => {
+                cacheLotes[l.id] = l;
                 const tr = document.createElement("tr");
                 tr.innerHTML = `
-                    <td><strong>${l.codigo_lote}</strong></td>
-                    <td>${l.cliente_nome}</td>
-                    <td>${l.nf_remessa || 'N/A'}</td>
+                    <td><strong>${escapeHtml(l.codigo_lote)}</strong></td>
+                    <td>${escapeHtml(l.cliente_nome)}</td>
+                    <td>${escapeHtml(l.nf_remessa || 'N/A')}</td>
                     <td><span class="badge badge-warning">Pendente Recebimento</span></td>
                     <td>
-                        <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="abrirReceberModal(${l.id}, '${l.codigo_lote}', '${l.cliente_nome}')">📥 Receber Físico</button>
+                        <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="abrirReceberModal(${Number(l.id)})">📥 Receber Físico</button>
                     </td>
                 `;
                 tbodyPre.appendChild(tr);
@@ -908,11 +952,12 @@ async function loadRecebimento() {
             tbodyAtivos.innerHTML = `<tr><td colspan="6" class="text-center text-muted">Nenhum lote em processo.</td></tr>`;
         } else {
             ativos.forEach(l => {
+                cacheLotes[l.id] = l;
                 const tr = document.createElement("tr");
                 const totalCab = l.cabecotes.length;
                 const concCab = l.cabecotes.filter(c => ['PRONTO', 'CONDENADO'].includes(c.status_etapa)).length;
 
-                const btnFicha = `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="abrirFichaModal(${l.id})">📋 Ficha Física</button>`;
+                const btnFicha = `<button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.75rem;" onclick="abrirFichaModal(${Number(l.id)})">📋 Ficha Física</button>`;
 
                 let badgeStatus = "badge-info";
                 if (l.status === "RECEBIDO") badgeStatus = "badge-warning";
@@ -920,11 +965,11 @@ async function loadRecebimento() {
                 if (l.status === "EXPEDIDO") badgeStatus = "badge-info";
 
                 tr.innerHTML = `
-                    <td><strong>${l.codigo_lote}</strong></td>
-                    <td>${l.cliente_nome}</td>
-                    <td>${l.nf_remessa || 'N/A'}</td>
-                    <td><span class="badge ${badgeStatus}">${l.status}</span></td>
-                    <td>${concCab}/${totalCab} peças</td>
+                    <td><strong>${escapeHtml(l.codigo_lote)}</strong></td>
+                    <td>${escapeHtml(l.cliente_nome)}</td>
+                    <td>${escapeHtml(l.nf_remessa || 'N/A')}</td>
+                    <td><span class="badge ${badgeStatus}">${escapeHtml(l.status)}</span></td>
+                    <td>${Number(concCab)}/${Number(totalCab)} peças</td>
                     <td>${btnFicha}</td>
                 `;
                 tbodyAtivos.appendChild(tr);
@@ -933,24 +978,25 @@ async function loadRecebimento() {
                 extraTr.className = "detail-row";
 
                 let cabListHtml = l.cabecotes.map(c => {
+                    cacheCabecotes[c.id] = c;
                     let classBadge = "badge-info";
                     let actionHtml = "";
 
                     if (c.status_etapa === "TRIAGEM") {
                         classBadge = "badge-warning";
-                        actionHtml = `<button class="btn btn-primary" style="padding: 3px 8px; font-size: 0.72rem; margin-left: 10px;" onclick="abrirChecklistModal(${c.id}, '${c.numero_serie}')">⚙️ Definir Rota</button>`;
+                        actionHtml = `<button class="btn btn-primary" style="padding: 3px 8px; font-size: 0.72rem; margin-left: 10px;" onclick="abrirChecklistModal(${Number(c.id)})">⚙️ Definir Rota</button>`;
                     } else if (c.status_etapa === "CONDENADO") {
                         classBadge = "badge-danger";
                     } else if (c.status_etapa === "PRONTO") {
                         classBadge = "badge-success";
                     }
 
-                    const btnRelatorio = `<button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem; margin-left: 8px;" onclick="abrirRelatorioIndividualModal(${c.id})">📄 Relatório PDF</button>`;
+                    const btnRelatorio = `<button class="btn btn-secondary" style="padding: 3px 8px; font-size: 0.72rem; margin-left: 8px;" onclick="abrirRelatorioIndividualModal(${Number(c.id)})">📄 Relatório PDF</button>`;
 
                     return `
                         <div style="margin: 8px 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
-                            <span style="font-family: monospace; font-weight: bold; min-width: 170px;">${c.numero_serie}</span>
-                            <span class="badge ${classBadge}">${c.status_etapa}</span>
+                            <span style="font-family: monospace; font-weight: bold; min-width: 170px;">${escapeHtml(c.numero_serie)}</span>
+                            <span class="badge ${classBadge}">${escapeHtml(c.status_etapa)}</span>
                             ${actionHtml}
                             ${btnRelatorio}
                         </div>
@@ -974,9 +1020,10 @@ async function loadRecebimento() {
 }
 
 function abrirReceberModal(id, codigo, cliente) {
-    currentLoteId = id;
-    document.getElementById("modal-recebimento-lote-cod").innerText = codigo;
-    document.getElementById("modal-recebimento-lote-cli").innerText = cliente;
+    currentLoteId = Number(id);
+    const l = cacheLotes[id] || {};
+    document.getElementById("modal-recebimento-lote-cod").innerText = codigo || l.codigo_lote || "";
+    document.getElementById("modal-recebimento-lote-cli").innerText = cliente || l.cliente_nome || "";
     document.getElementById("recebimento-seriais").value = "";
     openModal("modal-recebimento");
 }
@@ -1011,8 +1058,9 @@ async function confirmarRecebimentoFisico() {
 }
 
 function abrirChecklistModal(id, serial) {
-    currentCabecoteId = id;
-    document.getElementById("checklist-cabecote-serial").innerText = serial;
+    currentCabecoteId = Number(id);
+    const c = cacheCabecotes[id] || {};
+    document.getElementById("checklist-cabecote-serial").innerText = serial || c.numero_serie || "";
     document.getElementById("chk-jateamento").checked = true;
     document.getElementById("chk-estanqueidade").checked = true;
     document.getElementById("chk-faceamento").checked = true;
@@ -1063,9 +1111,9 @@ async function abrirFichaModal(loteId) {
 
         const printableArea = document.getElementById("printable-ficha-content");
 
-        let cabecotesRows = lote.cabecotes.map(c => `
+        let cabecotesRows = (lote.cabecotes || []).map(c => `
             <tr style="border-bottom: 1px solid #94a3b8;">
-                <td style="padding: 8px; font-family: monospace; font-weight: bold;">${c.numero_serie}</td>
+                <td style="padding: 8px; font-family: monospace; font-weight: bold;">${escapeHtml(c.numero_serie)}</td>
                 <td style="padding: 8px; color: #334155; font-size: 0.78rem;">
                     [ ] Lavagem &nbsp; [ ] Jateamento &nbsp; [ ] Estanqueidade (____ bar)<br>
                     Faceamento: Inicial _____ mm | Final _____ mm<br>
@@ -1082,18 +1130,18 @@ async function abrirFichaModal(loteId) {
                     <p style="margin: 4px 0 0 0; color: #475569;">Acompanhamento físico de recondicionamento de cabeçotes</p>
                 </div>
                 <div style="border: 2px solid black; padding: 6px; font-family: monospace; font-size: 1.1rem; text-align: center;">
-                    ||||||| ${lote.codigo_lote} |||||||
+                    ||||||| ${escapeHtml(lote.codigo_lote)} |||||||
                 </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; font-size: 0.9rem; background: #f8fafc; padding: 12px; border-radius: 6px;">
                 <div>
-                    <p><strong>Lote Oficial:</strong> ${lote.codigo_lote}</p>
-                    <p><strong>Cliente:</strong> ${lote.cliente_nome}</p>
+                    <p><strong>Lote Oficial:</strong> ${escapeHtml(lote.codigo_lote)}</p>
+                    <p><strong>Cliente:</strong> ${escapeHtml(lote.cliente_nome)}</p>
                 </div>
                 <div>
-                    <p><strong>NF Remessa:</strong> ${lote.nf_remessa || 'N/A'}</p>
-                    <p><strong>Data de Entrada:</strong> ${lote.data_entrada ? new Date(lote.data_entrada).toLocaleString('pt-BR') : 'N/A'}</p>
+                    <p><strong>NF Remessa:</strong> ${escapeHtml(lote.nf_remessa || 'N/A')}</p>
+                    <p><strong>Data de Entrada:</strong> ${escapeHtml(lote.data_entrada ? new Date(lote.data_entrada).toLocaleString('pt-BR') : 'N/A')}</p>
                 </div>
             </div>
 
@@ -1119,19 +1167,27 @@ async function abrirFichaModal(loteId) {
 // --- LISTAGEM GENÉRICA DAS ETAPAS DA OFICINA ---
 async function loadEtapaList(etapaName, elementId) {
     try {
-        const res = await fetch(`${API_BASE}/cabecotes?etapa=${etapaName}`);
-        const cabecotes = await res.json();
+        const [resCab, resLotes] = await Promise.all([
+            fetch(`${API_BASE}/cabecotes?etapa=${encodeURIComponent(etapaName)}`),
+            fetch(`${API_BASE}/lotes/resumo`)
+        ]);
+        const cabecotes = await resCab.json();
+        const lotesResumo = await resLotes.json();
+        const lotesMap = {};
+        if (Array.isArray(lotesResumo)) {
+            lotesResumo.forEach(l => { lotesMap[l.id] = l; });
+        }
 
         const tbody = document.getElementById(elementId);
         if (!tbody) return;
         tbody.innerHTML = "";
 
-        if (cabecotes.length === 0) {
+        if (!Array.isArray(cabecotes) || cabecotes.length === 0) {
             tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhuma peça nesta etapa atualmente.</td></tr>`;
         } else {
             for (let c of cabecotes) {
-                const resLote = await fetch(`${API_BASE}/lotes/${c.lote_id}`);
-                const lote = await resLote.json();
+                cacheCabecotes[c.id] = c;
+                const lote = lotesMap[c.lote_id] || { codigo_lote: 'N/A', cliente_nome: 'N/A' };
 
                 const tr = document.createElement("tr");
 
@@ -1140,15 +1196,15 @@ async function loadEtapaList(etapaName, elementId) {
 
                 if (etapaName === "LAVAGEM") {
                     extraColHtml = `<td><span class="badge badge-info">🧼 Lavagem</span></td>`;
-                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirLavagemModal(${c.id})">🧼 Registrar Lavagem</button>`;
+                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirLavagemModal(${Number(c.id)})">🧼 Registrar Lavagem</button>`;
                 } else if (etapaName === "JATEAMENTO") {
                     extraColHtml = `<td><span class="badge badge-info">💨 Jateamento</span></td>`;
-                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirJateamentoModal(${c.id})">💨 Registrar Jateamento</button>`;
+                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirJateamentoModal(${Number(c.id)})">💨 Registrar Jateamento</button>`;
                 } else if (etapaName === "ESTANQUEIDADE") {
                     extraColHtml = `<td><span class="badge badge-info">💧 Teste de Pressão</span></td>`;
-                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirEstanqueidadeModal(${c.id})">💧 Lançar Estanqueidade</button>`;
+                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirEstanqueidadeModal(${Number(c.id)})">💧 Lançar Estanqueidade</button>`;
                 } else if (etapaName === "FACEAMENTO") {
-                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirFaceamentoModal(${c.id})">📐 Lançar Medidas</button>`;
+                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirFaceamentoModal(${Number(c.id)})">📐 Lançar Medidas</button>`;
                 } else if (etapaName === "LAPIDACAO") {
                     let statusVacuoBadge = `<span class="badge badge-info">Aguardando 1º Teste de Vácuo</span>`;
                     if (c.lapidacao_status_retrabalho === "TROCAR_VALVULA") {
@@ -1157,20 +1213,20 @@ async function loadEtapaList(etapaName, elementId) {
                         statusVacuoBadge = `<span class="badge badge-danger">🚨 Reprovou Novamente ➔ TROCAR SEDE</span>`;
                     }
                     extraColHtml = `<td>${statusVacuoBadge}</td>`;
-                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick='abrirLapidacaoModal(${JSON.stringify(c)})'>💎 Confirmar Vácuo</button>`;
+                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirLapidacaoModal(${Number(c.id)})">💎 Confirmar Vácuo</button>`;
                 } else if (etapaName === "MONTAGEM") {
-                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirMontagemModal(${c.id})">🔧 Registrar Montagem</button>`;
+                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirMontagemModal(${Number(c.id)})">🔧 Registrar Montagem</button>`;
                 } else if (etapaName === "QUALIDADE") {
-                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirQualidadeModal(${c.id})">🛡️ Aprovar & Gerar Relatório</button>`;
+                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirQualidadeModal(${Number(c.id)})">🛡️ Aprovar & Gerar Relatório</button>`;
                 } else if (etapaName === "PINTURA") {
-                    extraColHtml = `<td><button class="btn btn-secondary btn-sm" onclick="abrirRelatorioIndividualModal(${c.id})">📄 Ver Relatório PDF</button></td>`;
-                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirPinturaModal(${c.id})">🎨 Registrar Pintura</button>`;
+                    extraColHtml = `<td><button class="btn btn-secondary btn-sm" onclick="abrirRelatorioIndividualModal(${Number(c.id)})">📄 Ver Relatório PDF</button></td>`;
+                    buttonHtml = `<button class="btn btn-primary btn-sm" onclick="abrirPinturaModal(${Number(c.id)})">🎨 Registrar Pintura</button>`;
                 }
 
                 tr.innerHTML = `
-                    <td><strong style="font-family: monospace;">${c.numero_serie}</strong></td>
-                    <td><span class="badge badge-info">${lote.codigo_lote}</span></td>
-                    <td>${lote.cliente_nome}</td>
+                    <td><strong style="font-family: monospace;">${escapeHtml(c.numero_serie)}</strong></td>
+                    <td><span class="badge badge-info">${escapeHtml(lote.codigo_lote)}</span></td>
+                    <td>${escapeHtml(lote.cliente_nome)}</td>
                     ${extraColHtml}
                     <td>${buttonHtml}</td>
                 `;
@@ -1178,7 +1234,7 @@ async function loadEtapaList(etapaName, elementId) {
             }
         }
     } catch (err) {
-        showToast(`Erro ao carregar lista de ${etapaName}`, "error");
+        showToast(`Erro ao carregar lista de ${escapeHtml(etapaName)}`, "error");
     }
 }
 
@@ -1260,13 +1316,15 @@ async function salvarJateamento() {
     }
 }
 
-// 3. Ações Estanqueidade (Foto + Checkbox + Pressão Aplicada)
+// 3. Ações Estanqueidade (Foto + Checkbox + Pressão Aplicada + Aprovação/Condenação)
 function abrirEstanqueidadeModal(id) {
-    currentCabecoteId = id;
+    currentCabecoteId = Number(id);
     document.getElementById("estanqueidade-file").value = "";
     document.getElementById("estanqueidade-foto-url").value = "";
     document.getElementById("estanqueidade-foto-preview").innerHTML = "";
     document.getElementById("estanqueidade-pressao").value = "";
+    const aprRadio = document.getElementById("estanqueidade-apr");
+    if (aprRadio) aprRadio.checked = true;
     document.getElementById("estanqueidade-checkbox").checked = true;
     document.getElementById("estanqueidade-operador").value = currentUser ? currentUser.nome_completo : "";
     openModal("modal-estanqueidade");
@@ -1277,20 +1335,28 @@ async function salvarEstanqueidade() {
     const checkbox = document.getElementById("estanqueidade-checkbox").checked;
     const pressao_aplicada = parseFloat(document.getElementById("estanqueidade-pressao").value);
     const operador = document.getElementById("estanqueidade-operador").value.trim();
+    const aprovadaRadio = document.querySelector('input[name="estanqueidade-resultado"]:checked');
+    const aprovada = aprovadaRadio ? aprovadaRadio.value === "aprovado" : true;
 
     if (!checkbox) return showToast("Marque o checkbox de confirmação da Estanqueidade.", "warning");
     if (isNaN(pressao_aplicada)) return showToast("Informe a Pressão Aplicada.", "warning");
     if (!operador) return showToast("Informe o operador responsável.", "warning");
 
+    if (!aprovada) {
+        if (!confirm("⚠️ ATENÇÃO: A reprovação no teste de estanqueidade CONDENARÁ a peça imediatamente (trinca/vazamento). Deseja prosseguir com a condenação?")) {
+            return;
+        }
+    }
+
     try {
         const res = await fetch(`${API_BASE}/etapas/estanqueidade/${currentCabecoteId}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ foto_url, checkbox, pressao_aplicada, operador })
+            body: JSON.stringify({ foto_url, checkbox, pressao_aplicada, operador, aprovada })
         });
 
         if (res.ok) {
-            showToast("Estanqueidade registrada com sucesso!");
+            showToast(aprovada ? "Estanqueidade registrada e aprovada!" : "Peça condenada por vazamento na estanqueidade.", aprovada ? "success" : "warning");
             closeModal("modal-estanqueidade");
             loadEtapaList('ESTANQUEIDADE', 'estanqueidade-list');
         } else {
@@ -1365,8 +1431,9 @@ function selecionarVacuoOption(val) {
     document.getElementById("label-vacuo-rep").classList.toggle("selected", val === "REP");
 }
 
-function abrirLapidacaoModal(cabecote) {
-    currentCabecoteId = cabecote.id;
+function abrirLapidacaoModal(cabecoteOrId) {
+    const cabecote = typeof cabecoteOrId === "object" ? cabecoteOrId : (cacheCabecotes[cabecoteOrId] || {});
+    currentCabecoteId = Number(cabecote.id || cabecoteOrId);
     selecionarVacuoOption("APR");
 
     document.getElementById("lap-trocou-valvula").checked = Boolean(cabecote.lapidacao_trocou_valvula);
@@ -1602,6 +1669,8 @@ async function loadAlmoxarifado() {
             slotsContainer.appendChild(div);
         });
 
+        window._cachedFreeSlots = stats.almoxarifado_espacos_ociosos || [];
+
         // Lotes CONCLUIDO prontos para Expedir
         const resLotes = await fetch(`${API_BASE}/lotes?status=CONCLUIDO`);
         const lotes = await resLotes.json();
@@ -1613,18 +1682,20 @@ async function loadAlmoxarifado() {
             tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhum lote concluído aguardando expedição.</td></tr>`;
         } else {
             lotes.forEach(l => {
+                cacheLotes[l.id] = l;
                 const tr = document.createElement("tr");
-                const botoesRelatorios = l.cabecotes.map(c =>
-                    `<button class="btn btn-secondary btn-sm" style="margin:2px;" onclick="abrirRelatorioIndividualModal(${c.id})">📄 ${c.numero_serie}</button>`
-                ).join(" ");
+                const botoesRelatorios = (l.cabecotes || []).map(c => {
+                    cacheCabecotes[c.id] = c;
+                    return `<button class="btn btn-secondary btn-sm" style="margin:2px;" onclick="abrirRelatorioIndividualModal(${Number(c.id)})">📄 ${escapeHtml(c.numero_serie)}</button>`;
+                }).join(" ");
 
                 tr.innerHTML = `
-                    <td><strong>${l.codigo_lote}</strong></td>
-                    <td>${l.cliente_nome}</td>
-                    <td>${l.nf_remessa || 'N/A'}</td>
+                    <td><strong>${escapeHtml(l.codigo_lote)}</strong></td>
+                    <td>${escapeHtml(l.cliente_nome)}</td>
+                    <td>${escapeHtml(l.nf_remessa || 'N/A')}</td>
                     <td>${botoesRelatorios}</td>
                     <td>
-                        <button class="btn btn-primary btn-sm" onclick='abrirExpedicaoModal(${l.id}, "${l.codigo_lote}", "${l.cliente_nome}", ${JSON.stringify(stats.almoxarifado_espacos_ociosos)})'>🚚 Expedir Lote</button>
+                        <button class="btn btn-primary btn-sm" onclick="abrirExpedicaoModal(${Number(l.id)})">🚚 Expedir Lote</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
@@ -1641,21 +1712,24 @@ async function loadAlmoxarifado() {
                 tbodyExp.innerHTML = `<tr><td colspan="7" class="text-center text-muted">Nenhum lote expedido até o momento.</td></tr>`;
             } else {
                 expedidos.forEach(l => {
+                    cacheLotes[l.id] = l;
                     const tr = document.createElement("tr");
-                    const botoesRelatorios = l.cabecotes.map(c =>
-                        `<button class="btn btn-secondary btn-sm" style="margin:2px;" onclick="abrirRelatorioIndividualModal(${c.id})">📄 ${c.numero_serie}</button>`
-                    ).join(" ");
+                    const botoesRelatorios = (l.cabecotes || []).map(c => {
+                        cacheCabecotes[c.id] = c;
+                        return `<button class="btn btn-secondary btn-sm" style="margin:2px;" onclick="abrirRelatorioIndividualModal(${Number(c.id)})">📄 ${escapeHtml(c.numero_serie)}</button>`;
+                    }).join(" ");
 
-                    const fotoHtml = l.expedicao_foto_url
-                        ? `<a href="${l.expedicao_foto_url}" target="_blank"><img src="${l.expedicao_foto_url}" style="width:42px; height:42px; object-fit:cover; border-radius:6px; border:1px solid var(--border-glass);"></a>`
+                    const safeFoto = urlFotoSegura(l.expedicao_foto_url);
+                    const fotoHtml = safeFoto
+                        ? `<a href="${safeFoto}" target="_blank"><img src="${safeFoto}" style="width:42px; height:42px; object-fit:cover; border-radius:6px; border:1px solid var(--border-glass);"></a>`
                         : `<span class="text-muted">—</span>`;
 
                     tr.innerHTML = `
-                        <td><strong>${l.codigo_lote}</strong></td>
-                        <td>${l.cliente_nome}</td>
-                        <td><span class="badge badge-success">${l.nf_retorno || 'N/A'}</span></td>
-                        <td>${l.veiculo || 'N/A'}</td>
-                        <td><strong>${l.motorista || 'N/A'}</strong></td>
+                        <td><strong>${escapeHtml(l.codigo_lote)}</strong></td>
+                        <td>${escapeHtml(l.cliente_nome)}</td>
+                        <td><span class="badge badge-success">${escapeHtml(l.nf_retorno || 'N/A')}</span></td>
+                        <td>${escapeHtml(l.veiculo || 'N/A')}</td>
+                        <td><strong>${escapeHtml(l.motorista || 'N/A')}</strong></td>
                         <td>${fotoHtml}</td>
                         <td>${botoesRelatorios}</td>
                     `;
@@ -1668,10 +1742,11 @@ async function loadAlmoxarifado() {
     }
 }
 
-function abrirExpedicaoModal(loteId, codigo, cliente, freeSlots) {
-    currentLoteId = loteId;
-    document.getElementById("modal-expedicao-lote-cod").innerText = codigo;
-    document.getElementById("modal-expedicao-lote-cli").innerText = cliente;
+function abrirExpedicaoModal(loteId) {
+    currentLoteId = Number(loteId);
+    const l = cacheLotes[loteId] || {};
+    document.getElementById("modal-expedicao-lote-cod").innerText = l.codigo_lote || "";
+    document.getElementById("modal-expedicao-lote-cli").innerText = l.cliente_nome || "";
     document.getElementById("exp-file").value = "";
     document.getElementById("exp-foto-url").value = "";
     document.getElementById("exp-foto-preview").innerHTML = "";
@@ -1682,19 +1757,30 @@ function abrirExpedicaoModal(loteId, codigo, cliente, freeSlots) {
     const select = document.getElementById("exp-pallet");
     select.innerHTML = "";
 
-    if (!freeSlots || freeSlots.length === 0) {
-        const opt = document.createElement("option");
-        opt.value = "ALM-A01";
-        opt.innerText = "ALM-A01";
-        select.appendChild(opt);
-    } else {
-        freeSlots.forEach(s => {
+    const palletAlocado = l.pallet_almoxarifado_final;
+    if (palletAlocado) {
+        const optAlocado = document.createElement("option");
+        optAlocado.value = palletAlocado;
+        optAlocado.textContent = `📍 ${palletAlocado} (Alocado)`;
+        optAlocado.selected = true;
+        select.appendChild(optAlocado);
+    }
+
+    const freeSlots = window._cachedFreeSlots || [];
+    freeSlots.forEach(s => {
+        if (s !== palletAlocado) {
             const opt = document.createElement("option");
             opt.value = s;
-            opt.innerText = s;
+            opt.textContent = `🟢 ${s} (Livre)`;
             select.appendChild(opt);
-        });
-    }
+        }
+    });
+
+    const optNenhum = document.createElement("option");
+    optNenhum.value = "";
+    optNenhum.textContent = "-- Sem alocação de pallet --";
+    if (!palletAlocado) optNenhum.selected = true;
+    select.appendChild(optNenhum);
 
     openModal("modal-expedicao");
 }
@@ -1777,18 +1863,18 @@ function renderTabelaRelatorios(lista) {
     lista.forEach(item => {
         const tr = document.createElement("tr");
         const statusRel = item.relatorio_gerado
-            ? `<span class="badge badge-success">✅ Salvo no Banco (${item.relatorio_data || 'Pronto'})</span>`
+            ? `<span class="badge badge-success">✅ Salvo no Banco (${escapeHtml(item.relatorio_data || 'Pronto')})</span>`
             : `<span class="badge badge-warning">⏳ Em Construção (Disponível Prévia)</span>`;
 
         tr.innerHTML = `
-            <td><strong style="font-family:monospace;">${item.numero_serie}</strong></td>
-            <td><span class="badge badge-purple">${item.numero_identificacao_peca || 'N/A'}</span></td>
-            <td><span class="badge badge-info">${item.codigo_lote}</span></td>
-            <td><strong>${item.cliente_nome}</strong></td>
-            <td><span class="badge badge-info">${item.status_etapa}</span></td>
+            <td><strong style="font-family:monospace;">${escapeHtml(item.numero_serie)}</strong></td>
+            <td><span class="badge badge-purple">${escapeHtml(item.numero_identificacao_peca || 'N/A')}</span></td>
+            <td><span class="badge badge-info">${escapeHtml(item.codigo_lote)}</span></td>
+            <td><strong>${escapeHtml(item.cliente_nome)}</strong></td>
+            <td><span class="badge badge-info">${escapeHtml(item.status_etapa)}</span></td>
             <td>${statusRel}</td>
             <td>
-                <button class="btn btn-primary btn-sm" onclick="abrirRelatorioIndividualModal(${item.cabecote_id})">
+                <button class="btn btn-primary btn-sm" onclick="abrirRelatorioIndividualModal(${Number(item.cabecote_id)})">
                     📄 Visualizar / Baixar PDF
                 </button>
             </td>
@@ -1804,23 +1890,27 @@ async function abrirRelatorioIndividualModal(cabecoteId) {
     openModal("modal-relatorio-individual");
 
     try {
-        const res = await fetch(`${API_BASE}/cabecotes/${cabecoteId}/relatorio`);
+        const res = await fetch(`${API_BASE}/cabecotes/${Number(cabecoteId)}/relatorio`);
         const rel = await res.json();
         const et = rel.etapas || {};
         const lote = rel.lote || {};
 
         const renderPhotoThumb = (url, label) => {
-            if (!url) return `<span style="color:#94a3b8; font-size:0.78rem;">Sem foto anexada</span>`;
+            const safe = urlFotoSegura(url);
+            if (!safe) return `<span style="color:#94a3b8; font-size:0.78rem;">Sem foto anexada</span>`;
             return `
                 <div style="margin-top:6px;">
-                    <img src="${url}" alt="${label}" style="max-height:110px; max-width:180px; border-radius:6px; border:1px solid #cbd5e1; object-fit:cover;">
+                    <a href="${safe}" target="_blank" rel="noopener noreferrer">
+                        <img src="${safe}" alt="${escapeHtml(label)}" style="max-height:110px; max-width:180px; border-radius:6px; border:1px solid #cbd5e1; object-fit:cover;">
+                    </a>
                 </div>
             `;
         };
 
-        const qualFotosHtml = (et.qualidade?.fotos && et.qualidade.fotos.length > 0)
+        const fotosQual = (et.qualidade?.fotos || []).map(u => urlFotoSegura(u)).filter(Boolean);
+        const qualFotosHtml = (fotosQual.length > 0)
             ? `<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
-                ${et.qualidade.fotos.map(u => `<img src="${u}" style="height:110px; width:150px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1;">`).join("")}
+                ${fotosQual.map(u => `<a href="${u}" target="_blank" rel="noopener noreferrer"><img src="${u}" style="height:110px; width:150px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1;"></a>`).join("")}
                </div>`
             : `<span style="color:#94a3b8; font-size:0.78rem;">Sem fotos adicionais anexadas na qualidade</span>`;
 
@@ -1833,24 +1923,24 @@ async function abrirRelatorioIndividualModal(cabecoteId) {
                         <p style="margin:4px 0 0 0; font-size: 0.85rem; color:#475569;">SCRC — Rastreabilidade Completa de Recondicionamento e Controle de Qualidade</p>
                     </div>
                     <div style="text-align:right; font-family:monospace; background:#f1f5f9; padding:8px 12px; border-radius:6px; border:1px solid #cbd5e1;">
-                        <div style="font-size:1rem; font-weight:700;">${rel.numero_serie}</div>
-                        <div style="font-size:0.75rem; color:#475569;">Emissão: ${rel.data_emissao}</div>
+                        <div style="font-size:1rem; font-weight:700;">${escapeHtml(rel.numero_serie)}</div>
+                        <div style="font-size:0.75rem; color:#475569;">Emissão: ${escapeHtml(rel.data_emissao)}</div>
                     </div>
                 </div>
 
                 <!-- Dados do Produto e Lote -->
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 14px; background:#f8fafc; padding: 14px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 18px; font-size: 0.85rem;">
                     <div>
-                        <p style="margin:3px 0;"><strong>Nº de Série Agregado:</strong> ${rel.numero_serie}</p>
-                        <p style="margin:3px 0;"><strong>Identificação da Peça (Cliente):</strong> ${rel.numero_identificacao_peca || 'N/A'}</p>
-                        <p style="margin:3px 0;"><strong>Cliente:</strong> ${lote.cliente_nome || 'N/A'}</p>
-                        <p style="margin:3px 0;"><strong>Lote:</strong> ${lote.codigo_lote || 'N/A'} | <strong>NF Entrada:</strong> ${lote.nf_remessa || 'N/A'}</p>
+                        <p style="margin:3px 0;"><strong>Nº de Série Agregado:</strong> ${escapeHtml(rel.numero_serie)}</p>
+                        <p style="margin:3px 0;"><strong>Identificação da Peça (Cliente):</strong> ${escapeHtml(rel.numero_identificacao_peca || 'N/A')}</p>
+                        <p style="margin:3px 0;"><strong>Cliente:</strong> ${escapeHtml(lote.cliente_nome || 'N/A')}</p>
+                        <p style="margin:3px 0;"><strong>Lote:</strong> ${escapeHtml(lote.codigo_lote || 'N/A')} | <strong>NF Entrada:</strong> ${escapeHtml(lote.nf_remessa || 'N/A')}</p>
                     </div>
                     <div>
-                        <p style="margin:3px 0;"><strong>Status Atual da Peça:</strong> <span style="font-weight:700; color:#0284c7;">${rel.status_etapa}</span></p>
-                        <p style="margin:3px 0;"><strong>NF Saída / Expedição:</strong> ${lote.nf_retorno || 'Aguardando expedição'}</p>
-                        <p style="margin:3px 0;"><strong>Veículo:</strong> ${lote.veiculo || '—'} | <strong>Motorista:</strong> ${lote.motorista || '—'}</p>
-                        <p style="margin:3px 0;"><strong>Data Entrada:</strong> ${lote.data_entrada || '—'} | <strong>Saída:</strong> ${lote.data_saida || '—'}</p>
+                        <p style="margin:3px 0;"><strong>Status Atual da Peça:</strong> <span style="font-weight:700; color:#0284c7;">${escapeHtml(rel.status_etapa)}</span></p>
+                        <p style="margin:3px 0;"><strong>NF Saída / Expedição:</strong> ${escapeHtml(lote.nf_retorno || 'Aguardando expedição')}</p>
+                        <p style="margin:3px 0;"><strong>Veículo:</strong> ${escapeHtml(lote.veiculo || '—')} | <strong>Motorista:</strong> ${escapeHtml(lote.motorista || '—')}</p>
+                        <p style="margin:3px 0;"><strong>Data Entrada:</strong> ${escapeHtml(lote.data_entrada || '—')} | <strong>Saída:</strong> ${escapeHtml(lote.data_saida || '—')}</p>
                     </div>
                 </div>
 
@@ -1864,7 +1954,7 @@ async function abrirRelatorioIndividualModal(cabecoteId) {
                     <div style="border:1px solid #cbd5e1; border-radius:8px; padding:10px;">
                         <div style="font-weight:700; color:#0f172a; margin-bottom:4px;">1. LAVAGEM</div>
                         <div><strong>Confirmado (Checkbox):</strong> ${et.lavagem?.checkbox ? '✅ Sim' : '⏳ Pendente'}</div>
-                        <div><strong>Operador:</strong> ${et.lavagem?.operador || '—'} (${et.lavagem?.data || '—'})</div>
+                        <div><strong>Operador:</strong> ${escapeHtml(et.lavagem?.operador || '—')} (${escapeHtml(et.lavagem?.data || '—')})</div>
                         ${renderPhotoThumb(et.lavagem?.foto_url, 'Foto Lavagem')}
                     </div>
 
@@ -1872,26 +1962,26 @@ async function abrirRelatorioIndividualModal(cabecoteId) {
                     <div style="border:1px solid #cbd5e1; border-radius:8px; padding:10px;">
                         <div style="font-weight:700; color:#0f172a; margin-bottom:4px;">2. JATEAMENTO</div>
                         <div><strong>Confirmado (Checkbox):</strong> ${et.jateamento?.checkbox ? '✅ Sim' : '⏳ Pendente'}</div>
-                        <div><strong>Operador:</strong> ${et.jateamento?.operador || '—'} (${et.jateamento?.data || '—'})</div>
+                        <div><strong>Operador:</strong> ${escapeHtml(et.jateamento?.operador || '—')} (${escapeHtml(et.jateamento?.data || '—')})</div>
                         ${renderPhotoThumb(et.jateamento?.foto_url, 'Foto Jateamento')}
                     </div>
 
                     <!-- 3. Estanqueidade -->
                     <div style="border:1px solid #cbd5e1; border-radius:8px; padding:10px;">
                         <div style="font-weight:700; color:#0f172a; margin-bottom:4px;">3. ESTANQUEIDADE</div>
-                        <div><strong>Confirmado (Checkbox):</strong> ${et.estanqueidade?.checkbox ? '✅ Aprovado' : '⏳ Pendente'}</div>
-                        <div><strong>Pressão Aplicada:</strong> ${et.estanqueidade?.pressao_aplicada != null ? et.estanqueidade.pressao_aplicada + ' bar/PSI' : '—'}</div>
-                        <div><strong>Operador:</strong> ${et.estanqueidade?.operador || '—'} (${et.estanqueidade?.data || '—'})</div>
+                        <div><strong>Confirmado (Checkbox):</strong> ${et.estanqueidade?.checkbox ? (et.estanqueidade?.aprovada === false ? '❌ Condenado' : '✅ Aprovado') : '⏳ Pendente'}</div>
+                        <div><strong>Pressão Aplicada:</strong> ${escapeHtml(String(et.estanqueidade?.pressao_aplicada != null ? et.estanqueidade.pressao_aplicada + ' bar/PSI' : '—'))}</div>
+                        <div><strong>Operador:</strong> ${escapeHtml(et.estanqueidade?.operador || '—')} (${escapeHtml(et.estanqueidade?.data || '—')})</div>
                         ${renderPhotoThumb(et.estanqueidade?.foto_url, 'Foto Estanqueidade')}
                     </div>
 
                     <!-- 4. Faceamento -->
                     <div style="border:1px solid #cbd5e1; border-radius:8px; padding:10px;">
                         <div style="font-weight:700; color:#0f172a; margin-bottom:4px;">4. FACEAMENTO</div>
-                        <div><strong>Medida Inicial:</strong> ${et.faceamento?.medida_inicial != null ? et.faceamento.medida_inicial + ' mm' : '—'}</div>
-                        <div><strong>Medida Final:</strong> ${et.faceamento?.medida_final != null ? et.faceamento.medida_final + ' mm' : '—'}</div>
-                        <div><strong>Desbaste Total:</strong> ${et.faceamento?.desbaste_mm != null ? et.faceamento.desbaste_mm + ' mm' : '—'} | <strong>Situação:</strong> ${et.faceamento?.condenado ? '❌ Condenado' : (et.faceamento?.concluido ? '✅ Aprovado' : '⏳ Pendente')}</div>
-                        <div><strong>Operador:</strong> ${et.faceamento?.operador || '—'} (${et.faceamento?.data || '—'})</div>
+                        <div><strong>Medida Inicial:</strong> ${escapeHtml(String(et.faceamento?.medida_inicial != null ? et.faceamento.medida_inicial + ' mm' : '—'))}</div>
+                        <div><strong>Medida Final:</strong> ${escapeHtml(String(et.faceamento?.medida_final != null ? et.faceamento.medida_final + ' mm' : '—'))}</div>
+                        <div><strong>Desbaste Total:</strong> ${escapeHtml(String(et.faceamento?.desbaste_mm != null ? et.faceamento.desbaste_mm + ' mm' : '—'))} | <strong>Situação:</strong> ${et.faceamento?.condenado ? '❌ Condenado' : (et.faceamento?.concluido ? '✅ Aprovado' : '⏳ Pendente')}</div>
+                        <div><strong>Operador:</strong> ${escapeHtml(et.faceamento?.operador || '—')} (${escapeHtml(et.faceamento?.data || '—')})</div>
                     </div>
 
                     <!-- 5. Lapidação -->
@@ -1899,7 +1989,7 @@ async function abrirRelatorioIndividualModal(cabecoteId) {
                         <div style="font-weight:700; color:#0f172a; margin-bottom:4px;">5. LAPIDAÇÃO & TESTE DE VÁCUO</div>
                         <div><strong>Confirmação do Vácuo:</strong> ${et.lapidacao?.confirmacao_vacuo === 'APR' ? '✅ APR (Aprovado)' : (et.lapidacao?.confirmacao_vacuo === 'REP' ? '❌ REP (Reprovado)' : '—')}</div>
                         <div><strong>Histórico Retrabalho:</strong> Trocou Válvula: ${et.lapidacao?.trocou_valvula ? 'Sim' : 'Não'} | Trocou Sede: ${et.lapidacao?.trocou_sede ? 'Sim' : 'Não'}</div>
-                        <div><strong>Operador:</strong> ${et.lapidacao?.operador || '—'} (${et.lapidacao?.data || '—'})</div>
+                        <div><strong>Operador:</strong> ${escapeHtml(et.lapidacao?.operador || '—')} (${escapeHtml(et.lapidacao?.data || '—')})</div>
                     </div>
 
                     <!-- 6. Montagem -->
@@ -1908,29 +1998,29 @@ async function abrirRelatorioIndividualModal(cabecoteId) {
                         <div><strong>Válvula:</strong> [${et.montagem?.valvula_exaustao ? 'X' : ' '}] Exaustão &nbsp; [${et.montagem?.valvula_admissao ? 'X' : ' '}] Admissão</div>
                         <div><strong>Sede:</strong> [${et.montagem?.sede_exaustao ? 'X' : ' '}] Exaustão &nbsp; [${et.montagem?.sede_admissao ? 'X' : ' '}] Admissão</div>
                         <div><strong>Guia:</strong> [${et.montagem?.guia_exaustao ? 'X' : ' '}] Exaustão &nbsp; [${et.montagem?.guia_admissao ? 'X' : ' '}] Admissão</div>
-                        <div><strong>Operador:</strong> ${et.montagem?.operador || '—'} (${et.montagem?.data || '—'})</div>
+                        <div><strong>Operador:</strong> ${escapeHtml(et.montagem?.operador || '—')} (${escapeHtml(et.montagem?.data || '—')})</div>
                     </div>
                 </div>
 
                 <!-- 7. Qualidade & 8. Pintura & 9. Expedição -->
                 <div style="border:1px solid #cbd5e1; border-radius:8px; padding:12px; margin-top:12px; font-size:0.83rem;">
                     <div style="font-weight:700; color:#0f172a; margin-bottom:4px;">7. INSPEÇÃO DE QUALIDADE</div>
-                    <div><strong>Parecer da Qualidade:</strong> ${et.qualidade?.aprovada === true ? '✅ APROVADO' : (et.qualidade?.aprovada === false ? '❌ REPROVADO' : '⏳ Pendente')} | <strong>Técnico:</strong> ${et.qualidade?.tecnico || '—'} (${et.qualidade?.data || '—'})</div>
-                    <div><strong>Observações:</strong> ${et.qualidade?.observacoes || 'Sem observações adicionais.'}</div>
+                    <div><strong>Parecer da Qualidade:</strong> ${et.qualidade?.aprovada === true ? '✅ APROVADO' : (et.qualidade?.aprovada === false ? '❌ REPROVADO' : '⏳ Pendente')} | <strong>Técnico:</strong> ${escapeHtml(et.qualidade?.tecnico || '—')} (${escapeHtml(et.qualidade?.data || '—')})</div>
+                    <div><strong>Observações:</strong> ${escapeHtml(et.qualidade?.observacoes || 'Sem observações adicionais.')}</div>
                     ${qualFotosHtml}
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top:12px; font-size:0.83rem;">
                     <div style="border:1px solid #cbd5e1; border-radius:8px; padding:10px;">
                         <div style="font-weight:700; color:#0f172a; margin-bottom:4px;">8. PINTURA</div>
-                        <div><strong>Status:</strong> ${et.pintura?.concluida ? '✅ Concluída' : '⏳ Pendente'} | <strong>Operador:</strong> ${et.pintura?.operador || '—'}</div>
+                        <div><strong>Status:</strong> ${et.pintura?.concluida ? '✅ Concluída' : '⏳ Pendente'} | <strong>Operador:</strong> ${escapeHtml(et.pintura?.operador || '—')}</div>
                         ${renderPhotoThumb(et.pintura?.foto_url, 'Foto Pintura')}
                     </div>
 
                     <div style="border:1px solid #cbd5e1; border-radius:8px; padding:10px;">
                         <div style="font-weight:700; color:#0f172a; margin-bottom:4px;">9. EXPEDIÇÃO</div>
-                        <div><strong>Nota Fiscal:</strong> ${lote.nf_retorno || '—'}</div>
-                        <div><strong>Veículo:</strong> ${lote.veiculo || '—'} | <strong>Motorista:</strong> ${lote.motorista || '—'}</div>
+                        <div><strong>Nota Fiscal:</strong> ${escapeHtml(lote.nf_retorno || '—')}</div>
+                        <div><strong>Veículo:</strong> ${escapeHtml(lote.veiculo || '—')} | <strong>Motorista:</strong> ${escapeHtml(lote.motorista || '—')}</div>
                         ${renderPhotoThumb(lote.expedicao_foto_url, 'Foto Expedição')}
                     </div>
                 </div>
@@ -2004,10 +2094,11 @@ function validateLoginInputs() {
 }
 
 async function verificarSessaoInicial() {
-    if (!authToken) {
-        exibirTelaLogin();
-        return;
-    }
+    // Remover resquícios legados de token no armazenamento do navegador
+    try {
+        localStorage.removeItem("scrc_auth_token");
+        sessionStorage.removeItem("scrc_auth_token");
+    } catch (e) {}
 
     try {
         const res = await fetch(`${API_BASE}/auth/me`);
@@ -2025,8 +2116,10 @@ async function verificarSessaoInicial() {
 function exibirTelaLogin(mensagemErro = null) {
     authToken = null;
     currentUser = null;
-    localStorage.removeItem("scrc_auth_token");
-    sessionStorage.removeItem("scrc_auth_token");
+    try {
+        localStorage.removeItem("scrc_auth_token");
+        sessionStorage.removeItem("scrc_auth_token");
+    } catch (e) {}
     if (refreshTimer) clearInterval(refreshTimer);
 
     const overlay = document.getElementById("login-overlay");
@@ -2083,12 +2176,13 @@ async function handleLoginSubmit(event) {
         const data = await res.json();
 
         if (res.ok) {
-            authToken = data.access_token;
             currentUser = data.usuario;
-            localStorage.setItem("scrc_auth_token", authToken);
-            sessionStorage.setItem("scrc_auth_token", authToken);
             passwordInput.value = "";
             errBox.classList.add("hidden");
+            try {
+                localStorage.removeItem("scrc_auth_token");
+                sessionStorage.removeItem("scrc_auth_token");
+            } catch (e) {}
             showToast(`Bem-vindo(a), ${currentUser.nome_completo}!`, "success");
             aplicarSessaoAutenticada();
         } else {
@@ -2102,6 +2196,15 @@ async function handleLoginSubmit(event) {
         submitBtn.disabled = false;
         submitBtn.innerHTML = `<span>🔐 Entrar no Sistema</span>`;
     }
+}
+
+function exigirTrocaDeSenhaObrigatoria() {
+    abrirAlterarSenhaModal();
+    const closeBtn = document.getElementById("btn-close-alterar-senha");
+    if (closeBtn) closeBtn.style.display = "none";
+    const title = document.getElementById("modal-alterar-senha-title");
+    if (title) title.innerText = "🔑 Troca de Senha Obrigatória no Primeiro Acesso";
+    showToast("Por motivos de segurança, você deve redefinir sua senha inicial antes de continuar.", "warning");
 }
 
 function aplicarSessaoAutenticada() {
@@ -2160,6 +2263,12 @@ function aplicarSessaoAutenticada() {
 
     verificarConfiguracaoLapidacao();
 
+    // Se o usuário precisa trocar de senha obrigatoriamente
+    if (currentUser.must_change_password) {
+        exigirTrocaDeSenhaObrigatoria();
+        return;
+    }
+
     // Navegar para a primeira tela permitida
     if (usuarioTemPermissao("dashboard")) {
         navigate("dashboard");
@@ -2172,9 +2281,7 @@ function aplicarSessaoAutenticada() {
 
 async function handleLogout() {
     try {
-        if (authToken) {
-            await fetch(`${API_BASE}/auth/logout`, { method: "POST" });
-        }
+        await fetch(`${API_BASE}/auth/logout`, { method: "POST" });
     } catch (err) {
         // Ignorar erro de rede ao deslogar
     }
@@ -2255,7 +2362,16 @@ async function salvarAlteracaoSenha(event) {
         const data = await res.json();
         if (res.ok) {
             showToast("Senha alterada com sucesso!");
+            const closeBtn = document.getElementById("btn-close-alterar-senha");
+            if (closeBtn) closeBtn.style.display = "";
             closeModal("modal-alterar-senha");
+
+            // Atualizar perfil atual
+            const meRes = await fetch(`${API_BASE}/auth/me`);
+            if (meRes.ok) {
+                currentUser = await meRes.json();
+                aplicarSessaoAutenticada();
+            }
         } else {
             showToast(data.detail || "Erro ao alterar senha.", "error");
         }
@@ -2332,6 +2448,7 @@ async function loadUsuariosScreen() {
         if (elBloq) elBloq.innerText = totalBloqueados;
 
         usuarios.forEach(u => {
+            cacheUsuarios[u.id] = u;
             const tr = document.createElement("tr");
 
             const perfilBadge = u.is_admin
@@ -2346,7 +2463,7 @@ async function loadUsuariosScreen() {
             } else {
                 permsHtml = u.permissoes.map(p => {
                     const found = PERMISSOES_CATALOGO.find(cat => cat.key === p);
-                    return `<span class="badge badge-info" style="margin:2px; font-size:0.7rem;">${found ? found.label : p}</span>`;
+                    return `<span class="badge badge-info" style="margin:2px; font-size:0.7rem;">${escapeHtml(found ? found.label : p)}</span>`;
                 }).join("");
             }
 
@@ -2356,7 +2473,7 @@ async function loadUsuariosScreen() {
                 ? `<span class="badge badge-success">Ativo</span>`
                 : `<span class="badge badge-danger">Inativo</span>`;
             if (bloqueado) {
-                statusHtml += ` <span class="badge badge-danger">🔒 Bloqueado (${u.tentativas_falhas} falhas)</span>`;
+                statusHtml += ` <span class="badge badge-danger">🔒 Bloqueado (${Number(u.tentativas_falhas)} falhas)</span>`;
             }
 
             const ultimoLoginStr = u.ultimo_login
@@ -2364,26 +2481,26 @@ async function loadUsuariosScreen() {
                 : "Nunca acessou";
 
             const btnDesbloquear = (bloqueado || u.tentativas_falhas > 0)
-                ? `<button class="btn btn-secondary btn-sm" onclick="desbloquearUsuario(${u.id})" title="Limpar falhas e desbloquear">🔓 Desbloquear</button>`
+                ? `<button class="btn btn-secondary btn-sm" onclick="desbloquearUsuario(${Number(u.id)})" title="Limpar falhas e desbloquear">🔓 Desbloquear</button>`
                 : "";
 
             const btnExcluir = (u.username !== "admin" && u.id !== currentUser.id)
-                ? `<button class="btn btn-danger btn-sm" onclick="excluirUsuario(${u.id}, '${u.username}')">🗑️</button>`
+                ? `<button class="btn btn-danger btn-sm" onclick="excluirUsuario(${Number(u.id)})">🗑️</button>`
                 : "";
 
             tr.innerHTML = `
-                <td><strong style="font-family:monospace;">${u.username}</strong></td>
+                <td><strong style="font-family:monospace;">${escapeHtml(u.username)}</strong></td>
                 <td>
-                    <strong>${u.nome_completo}</strong>
-                    <div class="text-muted" style="font-size:0.75rem;">${u.cargo || 'Operador'}</div>
+                    <strong>${escapeHtml(u.nome_completo)}</strong>
+                    <div class="text-muted" style="font-size:0.75rem;">${escapeHtml(u.cargo || 'Operador')}</div>
                 </td>
                 <td>${perfilBadge}</td>
                 <td style="max-width:340px;">${permsHtml}</td>
                 <td>${statusHtml}</td>
-                <td style="font-size:0.8rem;">${ultimoLoginStr}</td>
+                <td style="font-size:0.8rem;">${escapeHtml(ultimoLoginStr)}</td>
                 <td>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                        <button class="btn btn-primary btn-sm" onclick='editarUsuarioModal(${JSON.stringify(u)})'>✏️ Permissões / Editar</button>
+                        <button class="btn btn-primary btn-sm" onclick="editarUsuarioModal(${Number(u.id)})">✏️ Permissões / Editar</button>
                         ${btnDesbloquear}
                         ${btnExcluir}
                     </div>
@@ -2411,22 +2528,49 @@ async function loadPainelSeguranca20Itens() {
         const data = await res.json();
 
         const badgeResumo = document.getElementById("sec-score-badge");
-        if (badgeResumo && data.score_seguranca) {
-            badgeResumo.innerText = `${data.score_seguranca} ATIVAS (${data.status_geral || "PROTEGIDO"})`;
+        if (badgeResumo) {
+            const scoreOk = data.score?.ok != null ? data.score.ok : (data.score_seguranca ? data.score_seguranca.split("/")[0] : 0);
+            const scoreTotal = data.score?.total != null ? data.score.total : 20;
+            badgeResumo.innerText = `${scoreOk}/${scoreTotal} ATIVAS (${data.status_geral || "PROTEGIDO"})`;
+            if (data.status_geral === "PROTEGIDO") {
+                badgeResumo.className = "badge badge-success";
+            } else if (data.status_geral === "ATENCAO") {
+                badgeResumo.className = "badge badge-warning";
+            } else {
+                badgeResumo.className = "badge badge-danger";
+            }
         }
 
-        // Renderizar os 20 cartões de verificação
+        // Renderizar os 20 cartões de verificação dinâmica
         const listaVerificacoes = data.verificacoes || [];
         if (Array.isArray(listaVerificacoes)) {
-            grid.innerHTML = listaVerificacoes.map(item => `
-                <div style="background: rgba(15, 23, 42, 0.72); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
-                        <strong style="font-size: 0.82rem; color: #f8fafc;">#${item.numero}. ${escapeHtml(item.item)}</strong>
-                        <span class="badge badge-success" style="font-size: 0.65rem; padding: 2px 6px;">✅ ${escapeHtml(item.status)}</span>
+            grid.innerHTML = listaVerificacoes.map(item => {
+                let badgeClass = "badge badge-success";
+                let icon = "✅";
+                let borderStyle = "border: 1px solid rgba(16, 185, 129, 0.35);";
+                if (item.status === "ATENCAO") {
+                    badgeClass = "badge badge-warning";
+                    icon = "⚠️";
+                    borderStyle = "border: 1px solid rgba(245, 158, 11, 0.45);";
+                } else if (item.status === "FALHA") {
+                    badgeClass = "badge badge-danger";
+                    icon = "❌";
+                    borderStyle = "border: 1px solid rgba(239, 68, 68, 0.55);";
+                }
+                const acaoHtml = item.acao
+                    ? `<div style="font-size:0.7rem; color:#fde68a; margin-top:2px;">💡 ${escapeHtml(item.acao)}</div>`
+                    : "";
+                return `
+                    <div style="background: rgba(15, 23, 42, 0.72); ${borderStyle} border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                            <strong style="font-size: 0.82rem; color: #f8fafc;">#${Number(item.numero)}. ${escapeHtml(item.item)}</strong>
+                            <span class="${badgeClass}" style="font-size: 0.65rem; padding: 2px 6px;">${icon} ${escapeHtml(item.status)}</span>
+                        </div>
+                        <span style="font-size: 0.74rem; color: #94a3b8; line-height: 1.35;">${escapeHtml(item.detalhe)}</span>
+                        ${acaoHtml}
                     </div>
-                    <span style="font-size: 0.74rem; color: #94a3b8; line-height: 1.35;">${escapeHtml(item.detalhe)}</span>
-                </div>
-            `).join("");
+                `;
+            }).join("");
         }
 
         // Renderizar Monitoramento e Alertas de Segurança (Item 20)
@@ -2503,7 +2647,7 @@ async function gerarBackupManual() {
 
 async function exportarBackupJson() {
     try {
-        showToast("Preparando download seguro do backup...", "info");
+        showToast("Preparando download seguro do backup criptografado (.scrcbak)...", "info");
         const res = await fetch(`${API_BASE}/seguranca/backup/exportar`);
         if (!res.ok) {
             return showToast("Não foi possível exportar o backup.", "error");
@@ -2512,12 +2656,12 @@ async function exportarBackupJson() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `scrc_backup_seguro_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`;
+        a.download = `scrc_backup_seguro_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.scrcbak`;
         document.body.appendChild(a);
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
-        showToast("Download do backup concluído com sucesso!");
+        showToast("Download do backup criptografado concluído!");
         loadPainelSeguranca20Itens();
     } catch (err) {
         showToast("Erro ao baixar arquivo de backup.", "error");
@@ -2545,13 +2689,14 @@ function abrirModalUsuario() {
     openModal("modal-usuario");
 }
 
-function editarUsuarioModal(u) {
-    document.getElementById("modal-usuario-title").innerText = `✏️ Editar Usuário e Permissões: ${u.username}`;
-    document.getElementById("usr-id").value = u.id;
+function editarUsuarioModal(uOrId) {
+    const u = (typeof uOrId === "object" && uOrId !== null) ? uOrId : (cacheUsuarios[uOrId] || {});
+    document.getElementById("modal-usuario-title").innerText = `✏️ Editar Usuário e Permissões: ${u.username || ''}`;
+    document.getElementById("usr-id").value = u.id || "";
     const usernameEl = document.getElementById("usr-username");
-    usernameEl.value = u.username;
+    usernameEl.value = u.username || "";
     usernameEl.disabled = true;
-    document.getElementById("usr-nome").value = u.nome_completo;
+    document.getElementById("usr-nome").value = u.nome_completo || "";
     document.getElementById("usr-cargo").value = u.cargo || "Operador";
     const passEl = document.getElementById("usr-password");
     passEl.value = "";
@@ -2606,7 +2751,7 @@ async function salvarUsuarioSubmit(event) {
         } else {
             const payload = { nome_completo, cargo, is_admin, ativo, permissoes };
             if (password.length > 0) payload.password = password;
-            res = await fetch(`${API_BASE}/usuarios/${id}`, {
+            res = await fetch(`${API_BASE}/usuarios/${Number(id)}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
@@ -2632,7 +2777,7 @@ async function salvarUsuarioSubmit(event) {
 
 async function desbloquearUsuario(id) {
     try {
-        const res = await fetch(`${API_BASE}/usuarios/${id}`, {
+        const res = await fetch(`${API_BASE}/usuarios/${Number(id)}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ desbloquear: true })
@@ -2646,10 +2791,12 @@ async function desbloquearUsuario(id) {
     }
 }
 
-async function excluirUsuario(id, username) {
+async function excluirUsuario(id) {
+    const u = cacheUsuarios[id] || {};
+    const username = u.username || `ID ${id}`;
     if (!confirm(`Tem certeza que deseja excluir permanentemente o usuário '${username}'?`)) return;
     try {
-        const res = await fetch(`${API_BASE}/usuarios/${id}`, { method: "DELETE" });
+        const res = await fetch(`${API_BASE}/usuarios/${Number(id)}`, { method: "DELETE" });
         const data = await res.json();
         if (res.ok) {
             showToast(data.message || "Usuário removido.");

@@ -102,7 +102,6 @@ _DEFAULT_ALLOWED_ORIGINS = [
     "https://controle-cabecotes.vercel.app",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
-    "http://10.10.22.58:8080",
 ]
 _EXTRA_ORIGINS = [
     o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
@@ -163,14 +162,26 @@ async def enterprise_security_middleware(request: Request, call_next):
 
         # Item 13: Proteção contra CSRF em operações de escrita (POST, PUT, DELETE, PATCH)
         if request.method in ("POST", "PUT", "DELETE", "PATCH") and path != "/api/auth/login":
-            origin = request.headers.get("origin")
-            if origin:
-                origin_host = origin.split("://")[-1].split("/")[0]
-                if origin not in ALLOWED_ORIGINS and origin_host != host:
+            csrf_cookie = request.cookies.get("scrc_csrf")
+            csrf_header = request.headers.get("x-csrf-token")
+            if csrf_cookie and csrf_header:
+                import hmac
+                if not hmac.compare_digest(csrf_cookie, csrf_header):
                     return JSONResponse(
                         status_code=403,
-                        content={"detail": "Bloqueio de segurança CSRF: Origem não autorizada."}
+                        content={"detail": "Bloqueio de segurança CSRF: Token CSRF não confere."}
                     )
+            else:
+                origin = request.headers.get("origin")
+                referer = request.headers.get("referer")
+                req_src = origin or referer
+                if req_src:
+                    origin_host = req_src.split("://")[-1].split("/")[0]
+                    if not any(req_src.startswith(o) for o in ALLOWED_ORIGINS) and origin_host != host:
+                        return JSONResponse(
+                            status_code=403,
+                            content={"detail": "Bloqueio de segurança CSRF: Origem não autorizada."}
+                        )
 
     response = await call_next(request)
 
@@ -185,10 +196,12 @@ async def enterprise_security_middleware(request: Request, call_next):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
+        "script-src-attr 'unsafe-inline'; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com data:; "
         "img-src 'self' data: blob:; "
         "connect-src 'self'; "
+        "object-src 'none'; "
         "frame-ancestors 'none'; "
         "base-uri 'self'; "
         "form-action 'self'"
@@ -216,7 +229,6 @@ async def global_safe_exception_handler(request: Request, exc: Exception):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"^https://controle-cabecotes.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-CSRF-Token"],
@@ -248,10 +260,8 @@ except Exception:
 
 @app.get("/api/health")
 def health_check():
-    init_db_safe()
     return {
         "status": "error" if _BOOT_ERROR else "ok",
-        "security_checks": "20/20",
         "frontend_dir_exists": os.path.exists(FRONTEND_DIR),
         "db_initialized": _DB_INITIALIZED
     }
@@ -343,6 +353,8 @@ def upload_foto(
 @app.get("/uploads/{filename}")
 def get_uploaded_file(filename: str, db: Session = Depends(get_db)):
     safe_file = os.path.basename(filename)
+    if not re.match(r"^[a-zA-Z0-9_.-]{1,120}$", safe_file):
+        raise HTTPException(status_code=400, detail="Identificador de arquivo inválido.")
 
     # 1. Buscar no Banco de Dados (funciona na Vercel e localmente)
     foto_db = db.query(models.FotoArmazenada).filter(models.FotoArmazenada.filename == safe_file).first()
