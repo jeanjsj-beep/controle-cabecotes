@@ -7,10 +7,32 @@ let currentLoteId = null;
 let authToken = localStorage.getItem("scrc_auth_token") || sessionStorage.getItem("scrc_auth_token") || null;
 let currentUser = null;
 
-// Interceptador Global de Fetch para anexar Token Bearer e tratar 401/403 automaticamente
+// Utilitário Anti-XSS para escapar texto dinâmico inserido via innerHTML (Item 12)
+function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function getCookieValue(name) {
+    const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+    return match ? decodeURIComponent(match[2]) : null;
+}
+
+// Interceptador Global de Fetch para anexar Token Bearer, Cookie Seguro HttpOnly, Anti-CSRF e tratar 401/403
 const _originalFetch = window.fetch.bind(window);
 window.fetch = async function(url, options = {}) {
     options.headers = options.headers || {};
+    options.credentials = options.credentials || "same-origin";
+    options.headers["X-Requested-With"] = "XMLHttpRequest";
+    const csrfCookie = getCookieValue("scrc_csrf");
+    if (csrfCookie) {
+        options.headers["X-CSRF-Token"] = csrfCookie;
+    }
     if (authToken && typeof url === "string" && url.includes("/api/")) {
         options.headers["Authorization"] = `Bearer ${authToken}`;
     }
@@ -2371,6 +2393,134 @@ async function loadUsuariosScreen() {
         });
     } catch (err) {
         showToast("Erro ao carregar lista de usuários.", "error");
+    }
+
+    // Carregar também o diagnóstico das 20 verificações de segurança
+    loadPainelSeguranca20Itens();
+}
+
+// --- DIAGNÓSTICO DAS 20 VERIFICAÇÕES DE SEGURANÇA, BACKUP E MONITORAMENTO ---
+async function loadPainelSeguranca20Itens() {
+    if (!currentUser || !currentUser.is_admin) return;
+    const grid = document.getElementById("sec-20-grid");
+    if (!grid) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/seguranca/painel`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const badgeResumo = document.getElementById("sec-score-badge");
+        if (badgeResumo && data.score_seguranca) {
+            badgeResumo.innerText = `${data.score_seguranca} ATIVAS (${data.status_geral || "PROTEGIDO"})`;
+        }
+
+        // Renderizar os 20 cartões de verificação
+        const listaVerificacoes = data.verificacoes || [];
+        if (Array.isArray(listaVerificacoes)) {
+            grid.innerHTML = listaVerificacoes.map(item => `
+                <div style="background: rgba(15, 23, 42, 0.72); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                        <strong style="font-size: 0.82rem; color: #f8fafc;">#${item.numero}. ${escapeHtml(item.item)}</strong>
+                        <span class="badge badge-success" style="font-size: 0.65rem; padding: 2px 6px;">✅ ${escapeHtml(item.status)}</span>
+                    </div>
+                    <span style="font-size: 0.74rem; color: #94a3b8; line-height: 1.35;">${escapeHtml(item.detalhe)}</span>
+                </div>
+            `).join("");
+        }
+
+        // Renderizar Monitoramento e Alertas de Segurança (Item 20)
+        const tbodyEventos = document.getElementById("sec-audit-logs-body");
+        if (tbodyEventos) {
+            const evts = data.logs_recentes || [];
+            if (evts.length === 0) {
+                tbodyEventos.innerHTML = `<tr><td colspan="5" class="text-center text-muted">Nenhum evento registrado.</td></tr>`;
+            } else {
+                tbodyEventos.innerHTML = evts.map(ev => {
+                    const dtStr = ev.data_hora ? new Date(ev.data_hora + "Z").toLocaleString("pt-BR") : "-";
+                    let sevBadge = `<span class="badge badge-info" style="font-size:0.65rem;">INFO</span>`;
+                    if (ev.severidade === "WARN" || ev.severidade === "MEDIA") sevBadge = `<span class="badge badge-warning" style="font-size:0.65rem;">ALERTA</span>`;
+                    if (ev.severidade === "CRITICAL" || ev.severidade === "ALTA") sevBadge = `<span class="badge badge-danger" style="font-size:0.65rem;">CRÍTICO</span>`;
+                    return `
+                        <tr>
+                            <td style="font-size:0.72rem; white-space:nowrap;">${escapeHtml(dtStr)}</td>
+                            <td>${sevBadge}</td>
+                            <td><strong style="font-size:0.73rem;">${escapeHtml(ev.evento)}</strong></td>
+                            <td style="font-size:0.72rem; font-family:monospace;">${escapeHtml(ev.usuario || "-")} <br><span class="text-muted">${escapeHtml(ev.ip_origem || "")}</span></td>
+                            <td style="font-size:0.73rem;">${escapeHtml(ev.detalhes || "")}</td>
+                        </tr>
+                    `;
+                }).join("");
+            }
+        }
+
+        // Renderizar Lista de Backups Criptografados (Item 17 & 19)
+        const tbodyBackups = document.getElementById("sec-backups-body");
+        if (tbodyBackups) {
+            const listaBkp = data.backups || [];
+            if (listaBkp.length === 0) {
+                tbodyBackups.innerHTML = `<tr><td colspan="4" class="text-center text-muted">Nenhum snapshot disponível.</td></tr>`;
+            } else {
+                tbodyBackups.innerHTML = listaBkp.map(b => {
+                    const dtStr = b.criado_em ? new Date(b.criado_em + "Z").toLocaleString("pt-BR") : "-";
+                    const badgeTipo = b.tipo && b.tipo.includes("AUTO")
+                        ? `<span class="badge badge-info" style="font-size:0.68rem;">⏰ Auto 24h</span>`
+                        : `<span class="badge badge-warning" style="font-size:0.68rem;">💾 Manual</span>`;
+                    return `
+                        <tr>
+                            <td style="font-size:0.75rem; white-space:nowrap;">${escapeHtml(dtStr)}</td>
+                            <td>${badgeTipo}</td>
+                            <td style="font-size:0.74rem; font-family:monospace;">${escapeHtml(b.autor || "sistema")}</td>
+                            <td style="font-size:0.73rem;">
+                                <div>${escapeHtml(b.resumo_registros || "")}</div>
+                                <code style="font-size:0.68rem; color:#38bdf8;" title="${escapeHtml(b.sha256_checksum)}">SHA-256: ${escapeHtml((b.sha256_checksum || "").substring(0, 16))}...</code>
+                            </td>
+                        </tr>
+                    `;
+                }).join("");
+            }
+        }
+    } catch (err) {
+        console.error("Erro ao carregar diagnóstico de segurança:", err);
+    }
+}
+
+async function gerarBackupManual() {
+    try {
+        showToast("Gerando snapshot criptografado (CTR-HMAC-SHA256)...", "info");
+        const res = await fetch(`${API_BASE}/seguranca/backup`, { method: "POST" });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(`Backup #${data.backup_id} criptografado com sucesso! SHA-256: ${(data.sha256_checksum || "").substring(0, 12)}...`);
+            loadPainelSeguranca20Itens();
+        } else {
+            showToast(data.detail || "Falha ao gerar backup.", "error");
+        }
+    } catch (err) {
+        showToast("Erro de rede ao gerar backup manual.", "error");
+    }
+}
+
+async function exportarBackupJson() {
+    try {
+        showToast("Preparando download seguro do backup...", "info");
+        const res = await fetch(`${API_BASE}/seguranca/backup/exportar`);
+        if (!res.ok) {
+            return showToast("Não foi possível exportar o backup.", "error");
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `scrc_backup_seguro_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showToast("Download do backup concluído com sucesso!");
+        loadPainelSeguranca20Itens();
+    } catch (err) {
+        showToast("Erro ao baixar arquivo de backup.", "error");
     }
 }
 

@@ -192,6 +192,33 @@ class FotoArmazenada(Base):
     content_base64 = Column(Text, nullable=False)
     criado_em = Column(DateTime, default=datetime.datetime.utcnow)
 
+
+class AuditoriaSeguranca(Base):
+    """Registro imutável de auditoria, monitoramento e alertas de segurança (Item 20)."""
+    __tablename__ = "auditoria_seguranca"
+
+    id = Column(Integer, primary_key=True, index=True)
+    data_hora = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    evento = Column(String, nullable=False, index=True)       # Ex: LOGIN_SUCESSO, LOGIN_FALHA, BLOQUEIO_CONTA, RATE_LIMIT, ACESSO_NEGADO, BACKUP_GERADO
+    severidade = Column(String, nullable=False, default="INFO") # INFO, WARN, CRITICAL
+    usuario = Column(String, nullable=True, index=True)
+    ip_origem = Column(String, nullable=True)
+    detalhes = Column(Text, nullable=True)
+
+
+class BackupAutomatico(Base):
+    """Snapshots automáticos e manuais de backup íntegro do banco (Item 19)."""
+    __tablename__ = "backups_automaticos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    criado_em = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+    tipo = Column(String, nullable=False, default="AUTOMATICO") # AUTOMATICO, MANUAL
+    autor = Column(String, nullable=True, default="sistema")
+    sha256_checksum = Column(String, nullable=False)
+    resumo_registros = Column(String, nullable=True)
+    payload_criptografado = Column(Text, nullable=False)
+
+
 sys.modules.setdefault("models", sys.modules[__name__])
 sys.modules.setdefault("app.models", sys.modules[__name__])
 

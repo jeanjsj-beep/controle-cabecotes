@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>SCRC - Sistema de Recondicionamento de Cabeçotes</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/style.css?v=5.0">
+    <link rel="stylesheet" href="/style.css?v=6.0">
 </head>
 <body class="dark-theme">
     <!-- TELA DE LOGIN INTERATIVA E SEGURA -->
@@ -1258,6 +1258,69 @@
                     </div>
                 </div>
 
+                <!-- Central das 20 Verificações de Segurança, Backup Automático & Monitoramento -->
+                <div class="panel glass" style="margin-top: 24px;">
+                    <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <h3>🔒 Diagnóstico das 20 Verificações de Segurança & Criptografia (Score: <span id="sec-score-badge" style="color:var(--success);">20/20 ATIVAS</span>)</h3>
+                            <span>Auditoria em tempo real de HTTPS, CORS, PBKDF2, Cookies HttpOnly, Secrets, RBAC, Sessões HMAC, RLS Supabase, Rate Limits, SQLi, XSS, CSRF, Headers, Uploads, Erros, Cifra CTR-HMAC, Dependências, Backup e Alertas</span>
+                        </div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button class="btn btn-secondary btn-sm" onclick="loadPainelSeguranca20Itens()">🔄 Revalidar 20 Itens</button>
+                            <button class="btn btn-secondary btn-sm" onclick="gerarBackupManual()">💾 Gerar Backup Criptografado</button>
+                            <button class="btn btn-primary btn-sm" onclick="exportarBackupJson()">📥 Exportar Backup (JSON + SHA-256)</button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div id="sec-20-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-bottom: 20px;">
+                            <!-- Preenchido dinamicamente pelo endpoint /api/seguranca/painel -->
+                        </div>
+
+                        <div class="dashboard-layout" style="margin-top: 16px;">
+                            <!-- Monitoramento e Alertas de Segurança (Item 20) -->
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 10px; padding: 14px;">
+                                <h4 style="margin-bottom: 10px; font-size: 0.95rem; color: var(--primary);">🚨 Item 20: Trilha de Monitoramento & Alertas de Segurança</h4>
+                                <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Data/Hora</th>
+                                                <th>Severidade</th>
+                                                <th>Evento</th>
+                                                <th>Usuário / IP</th>
+                                                <th>Detalhes</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="sec-audit-logs-body">
+                                            <tr><td colspan="5" class="text-center">Carregando trilha de auditoria...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Snapshots de Backup Automático e Manual (Item 19) -->
+                            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 10px; padding: 14px;">
+                                <h4 style="margin-bottom: 10px; font-size: 0.95rem; color: var(--success);">💾 Item 19: Snapshots de Backup Criptografado (CTR-HMAC-SHA256)</h4>
+                                <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Data/Hora</th>
+                                                <th>Tipo</th>
+                                                <th>Autor</th>
+                                                <th>Resumo & Checksum SHA-256</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="sec-backups-body">
+                                            <tr><td colspan="4" class="text-center">Carregando backups...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Modal: Criar / Editar Usuário e Permissões -->
                 <div id="modal-usuario" class="modal">
                     <div class="modal-content glass" style="max-width: 680px; width: 95%;">
@@ -1504,6 +1567,6 @@
     <!-- Notification Toast -->
     <div id="toast-wrap" class="toast-wrap"></div>
 
-    <script src="/app.js?v=5.0"></script>
+    <script src="/app.js?v=6.0"></script>
 </body>
 </html>

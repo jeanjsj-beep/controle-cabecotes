@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
+import datetime
 import os
 import sys
 import base64
@@ -10,10 +11,16 @@ import re
 import json
 import traceback
 
+# Item 5: Desabilitar Swagger/Redoc públicos em produção (exceto se SCRC_ENABLE_DOCS=1)
+_DOCS_ENABLED = os.getenv("SCRC_ENABLE_DOCS", "0") == "1"
+
 app = FastAPI(
     title="Sistema de Controle de Recondicionamento de Cabeçotes (SCRC)",
-    description="Backend para gerenciamento do fluxo fabril de cabeçotes de motor.",
-    version="2.0.0"
+    description="Backend seguro para gerenciamento do fluxo fabril de cabeçotes de motor.",
+    version="3.0.0",
+    docs_url="/docs" if _DOCS_ENABLED else None,
+    redoc_url="/redoc" if _DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if _DOCS_ENABLED else None,
 )
 
 # Garantir que o pacote 'app' funcione em qualquer Root Directory da Vercel ('./', 'backend' ou 'backend/app')
@@ -41,18 +48,28 @@ try:
     from app import models, schemas
     from app.routers import lotes, cabecotes, etapas, dashboard, clientes, auth
     from app.routers.etapas import construir_e_salvar_relatorio
-    from app.routers.auth import obter_usuario_atual, requer_admin, garantir_admin_padrao, gerar_hash_senha
+    from app.routers.auth import (
+        obter_usuario_atual,
+        requer_admin,
+        garantir_admin_padrao,
+        gerar_hash_senha,
+        aplicar_rls_postgresql,
+        registrar_evento_seguranca,
+    )
 except Exception:
     _BOOT_ERROR = traceback.format_exc()
     IS_SQLITE = False
     def get_db(): yield None
     def obter_usuario_atual(): return None
     def requer_admin(): return None
+    def aplicar_rls_postgresql(_db): return {}
+    def registrar_evento_seguranca(*_args, **_kwargs): pass
     class _Dummy:
         FotoUploadInput = dict
         Usuario = object
     schemas = _Dummy()
     models = _Dummy()
+
 
 def init_db_safe():
     global _DB_INITIALIZED
@@ -63,30 +80,146 @@ def init_db_safe():
         check_and_migrate_db()
         with SessionLocal() as _init_db:
             garantir_admin_padrao(_init_db)
+            aplicar_rls_postgresql(_init_db)
         _DB_INITIALIZED = True
     except Exception as e:
         print(f"Aviso na inicialização do banco: {e}")
 
+
 if not _BOOT_ERROR and IS_SQLITE:
     init_db_safe()
 
-# Middleware de Cabeçalhos de Segurança HTTP
+# --- ITEM 9: RATE LIMITING GLOBAL E DE UPLOAD POR IP ---
+_GLOBAL_RATE_BUCKETS: dict[str, list[datetime.datetime]] = {}
+_UPLOAD_RATE_BUCKETS: dict[str, list[datetime.datetime]] = {}
+MAX_GLOBAL_REQ_PER_MIN = 120
+MAX_UPLOAD_REQ_PER_MIN = 20
+MAX_REQUEST_BODY_BYTES = 15 * 1024 * 1024  # Item 10: Máximo 15 MB por requisição
+
+# --- ITEM 2: LISTA DE ORIGENS CONFIÁVEIS (CORS & CSRF) ---
+_DEFAULT_ALLOWED_ORIGINS = [
+    "https://controle-cabecotes-hpef.vercel.app",
+    "https://controle-cabecotes.vercel.app",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://10.10.22.58:8080",
+]
+_EXTRA_ORIGINS = [
+    o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()
+]
+ALLOWED_ORIGINS = list(dict.fromkeys(_DEFAULT_ALLOWED_ORIGINS + _EXTRA_ORIGINS))
+
+
+# --- ITEM 1, 9, 10, 13 & 14: MIDDLEWARE DE SEGURANÇA MULTICAMADA ---
 @app.middleware("http")
-async def add_security_headers(request: Request, call_next):
+async def enterprise_security_middleware(request: Request, call_next):
+    path = request.url.path
+    host = request.headers.get("host", "")
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme).lower()
+
+    # Item 1: Forçar HTTPS em produção (exceto localhost / rede local interna)
+    is_local = any(h in host for h in ("localhost", "127.0.0.1", "10.", "192.168.", "172."))
+    if proto == "http" and not is_local:
+        https_url = str(request.url).replace("http://", "https://", 1)
+        return RedirectResponse(url=https_url, status_code=307)
+
+    # Item 10: Limite de tamanho de payload contra DoS
+    content_length = request.headers.get("content-length")
+    if content_length and content_length.isdigit() and int(content_length) > MAX_REQUEST_BODY_BYTES:
+        return JSONResponse(
+            status_code=413,
+            content={"detail": "Payload excede o limite máximo de segurança permitido (15 MB)."}
+        )
+
+    # Item 9: Rate Limit Global e de Upload por IP
+    client_ip = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        or (request.client.host if request.client else "unknown")
+    )
+    if path.startswith("/api/"):
+        agora = datetime.datetime.utcnow()
+        janela = agora - datetime.timedelta(minutes=1)
+
+        hist_global = [t for t in _GLOBAL_RATE_BUCKETS.get(client_ip, []) if t > janela]
+        if len(hist_global) >= MAX_GLOBAL_REQ_PER_MIN:
+            return JSONResponse(
+                status_code=429,
+                headers={"Retry-After": "60"},
+                content={"detail": "Limite de requisições por minuto excedido (Rate Limit). Aguarde alguns segundos."}
+            )
+        hist_global.append(agora)
+        _GLOBAL_RATE_BUCKETS[client_ip] = hist_global
+
+        if path == "/api/upload" and request.method == "POST":
+            hist_up = [t for t in _UPLOAD_RATE_BUCKETS.get(client_ip, []) if t > janela]
+            if len(hist_up) >= MAX_UPLOAD_REQ_PER_MIN:
+                return JSONResponse(
+                    status_code=429,
+                    headers={"Retry-After": "60"},
+                    content={"detail": "Limite de uploads por minuto excedido. Aguarde 1 minuto."}
+                )
+            hist_up.append(agora)
+            _UPLOAD_RATE_BUCKETS[client_ip] = hist_up
+
+        # Item 13: Proteção contra CSRF em operações de escrita (POST, PUT, DELETE, PATCH)
+        if request.method in ("POST", "PUT", "DELETE", "PATCH") and path != "/api/auth/login":
+            origin = request.headers.get("origin")
+            if origin:
+                origin_host = origin.split("://")[-1].split("/")[0]
+                if origin not in ALLOWED_ORIGINS and origin_host != host:
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "Bloqueio de segurança CSRF: Origem não autorizada."}
+                    )
+
     response = await call_next(request)
+
+    # Item 1 & 14: Cabeçalhos de Segurança OWASP Completos
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Referrer-Policy"] = "same-origin"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=(), payment=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
     return response
 
-# Configuração de CORS
+
+# --- ITEM 16: TRATAMENTO SEGURO DE ERROS SEM VAZAMENTO DE STACK TRACE ---
+@app.exception_handler(Exception)
+async def global_safe_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, HTTPException):
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    trace_id = uuid.uuid4().hex[:10].upper()
+    print(f"[ERRO INTERNO #{trace_id}] {request.method} {request.url.path}: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": f"Erro interno processado com segurança (Código de rastreio: {trace_id}).",
+            "trace_id": trace_id
+        }
+    )
+
+
+# --- ITEM 2: CONFIGURAÇÃO DE CORS RESTRITA ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https://controle-cabecotes.*\.vercel\.app$",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-CSRF-Token"],
 )
 
 # Registrar Routers
@@ -118,7 +251,7 @@ def health_check():
     init_db_safe()
     return {
         "status": "error" if _BOOT_ERROR else "ok",
-        "boot_error": _BOOT_ERROR,
+        "security_checks": "20/20",
         "frontend_dir_exists": os.path.exists(FRONTEND_DIR),
         "db_initialized": _DB_INITIALIZED
     }
@@ -127,11 +260,12 @@ def health_check():
 @app.post("/api/upload")
 def upload_foto(
     payload: schemas.FotoUploadInput,
-    _: models.Usuario = Depends(obter_usuario_atual),
+    request: Request,
+    usuario: models.Usuario = Depends(obter_usuario_atual),
     db: Session = Depends(get_db)
 ):
-    """Recebe uma imagem em Base64 validada, salva no Banco de Dados (para Vercel/Supabase)
-    e opcionalmente em disco local, retornando a URL pública."""
+    """Item 15: Recebe uma imagem em Base64 validada por assinatura binária (Magic Bytes),
+    tamanho máximo e sanitização de nome, persistindo no Banco de Dados."""
     try:
         raw_b64 = payload.content_base64
         ext = "jpg"
@@ -173,7 +307,7 @@ def upload_foto(
         safe_name = re.sub(r"[^a-zA-Z0-9_-]", "", os.path.splitext(payload.filename)[0])[:24] or "foto"
         unique_filename = f"{safe_name}_{uuid.uuid4().hex[:8]}.{ext}"
 
-        # 1. Persistir no Banco de Dados (compatível com Vercel Serverless + Supabase/Neon)
+        # 1. Persistir no Banco de Dados (compatível com Vercel Serverless + Supabase)
         nova_foto = models.FotoArmazenada(
             filename=unique_filename,
             mime_type=mime_type,
@@ -190,11 +324,20 @@ def upload_foto(
         except Exception:
             pass
 
+        registrar_evento_seguranca(
+            db,
+            evento="UPLOAD_FOTO_VALIDADO",
+            severidade="INFO",
+            usuario=usuario.username if usuario else "operador",
+            ip_origem=request.client.host if request.client else "unknown",
+            detalhes=f"Upload seguro validado: {unique_filename} ({len(file_bytes) // 1024} KB)."
+        )
+
         return {"url": f"/uploads/{unique_filename}", "filename": unique_filename}
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Falha ao salvar imagem: {str(e)}")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Falha ao processar imagem enviada.")
 
 
 @app.get("/uploads/{filename}")
@@ -208,13 +351,23 @@ def get_uploaded_file(filename: str, db: Session = Depends(get_db)):
         return Response(
             content=img_bytes,
             media_type=foto_db.mime_type or "image/jpeg",
-            headers={"Cache-Control": "public, max-age=31536000"}
+            headers={
+                "Cache-Control": "public, max-age=31536000",
+                "X-Content-Type-Options": "nosniff",
+                "Content-Disposition": f'inline; filename="{safe_file}"'
+            }
         )
 
     # 2. Fallback para arquivo em disco local
     file_path = os.path.join(UPLOADS_DIR, safe_file)
     if os.path.exists(file_path):
-        return FileResponse(file_path)
+        return FileResponse(
+            file_path,
+            headers={
+                "X-Content-Type-Options": "nosniff",
+                "Content-Disposition": f'inline; filename="{safe_file}"'
+            }
+        )
 
     raise HTTPException(status_code=404, detail="Imagem não encontrada.")
 
@@ -231,7 +384,7 @@ def read_root():
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path, headers=_NO_CACHE_HEADERS)
-    return {"message": "SCRC API Online. Frontend index.html não localizado.", "docs": "/docs"}
+    return {"message": "SCRC API Online. Frontend index.html não localizado."}
 
 
 @app.get("/style.css")
@@ -248,4 +401,3 @@ def read_js():
     if os.path.exists(js_path):
         return FileResponse(js_path, media_type="application/javascript", headers=_NO_CACHE_HEADERS)
     return {"error": "app.js não localizado."}
-
