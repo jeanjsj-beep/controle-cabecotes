@@ -1,0 +1,15 @@
+﻿# Python & Ambiente Virtual
+backend/venv/
+venv/
+__pycache__/
+*.py[cod]
+*.class
+
+# Bancos locais SQLite
+*.db
+*.sqlite3
+
+# Arquivos temporários e OS
+.DS_Store
+Thumbs.db
+.env
