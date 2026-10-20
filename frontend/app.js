@@ -1931,19 +1931,6 @@ async function toggleLapidacaoModule(checked) {
     }
 }
 
-// Popular banco com dados demo
-async function seedDatabase() {
-    try {
-        const res = await fetch(`${API_BASE}/sistema/seed`, { method: "POST" });
-        if (res.ok) {
-            showToast("Banco populado com o novo fluxo e relatórios individuais!");
-            fetchStats();
-        }
-    } catch (err) {
-        showToast("Falha de rede ao popular banco.", "error");
-    }
-}
-
 
 // ============================================================
 // AUTENTICAÇÃO SEGURA, RBAC E GESTÃO DE USUÁRIOS & PERMISSÕES
@@ -2081,7 +2068,6 @@ function aplicarSessaoAutenticada() {
     const badgeEl = document.getElementById("logged-user-badge");
     const avatarEl = document.getElementById("logged-user-avatar");
     const roleFooter = document.getElementById("sidebar-user-role");
-    const seedBtn = document.getElementById("btn-seed-demo");
 
     if (nameEl) nameEl.innerText = currentUser.nome_completo;
     if (badgeEl) {
@@ -2096,9 +2082,6 @@ function aplicarSessaoAutenticada() {
     }
     if (roleFooter) {
         roleFooter.innerText = `${currentUser.username} (${currentUser.is_admin ? "Admin" : "Autenticado"})`;
-    }
-    if (seedBtn) {
-        seedBtn.style.display = currentUser.is_admin ? "inline-flex" : "none";
     }
 
     // Filtrar itens do menu lateral conforme permissões do usuário
