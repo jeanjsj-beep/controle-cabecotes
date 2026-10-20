@@ -232,6 +232,24 @@ function usuarioTemPermissao(screenName) {
     return Array.isArray(currentUser.permissoes) && currentUser.permissoes.includes(screenName);
 }
 
+// Controle do Menu Lateral Responsivo (Mobile Drawer)
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById("app-sidebar");
+    const backdrop = document.getElementById("mobile-sidebar-backdrop");
+    if (!sidebar) return;
+    const isOpen = sidebar.classList.toggle("mobile-open");
+    if (backdrop) {
+        backdrop.classList.toggle("active", isOpen);
+    }
+}
+
+function closeMobileSidebar() {
+    const sidebar = document.getElementById("app-sidebar");
+    const backdrop = document.getElementById("mobile-sidebar-backdrop");
+    if (sidebar) sidebar.classList.remove("mobile-open");
+    if (backdrop) backdrop.classList.remove("active");
+}
+
 // Navegação entre telas com validação de permissão
 function navigate(screenName) {
     if (!currentUser) return;
@@ -241,8 +259,13 @@ function navigate(screenName) {
         return;
     }
 
+    closeMobileSidebar();
+
     document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
     document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
+    document.querySelectorAll(".mobile-nav-btn[data-screen]").forEach(btn => {
+        btn.classList.toggle("active", btn.getAttribute("data-screen") === screenName);
+    });
 
     const targetScreen = document.getElementById(`screen-${screenName}`);
     if (targetScreen) {
@@ -2083,6 +2106,16 @@ function aplicarSessaoAutenticada() {
     if (topAdminBtn) {
         topAdminBtn.style.display = currentUser.is_admin ? "inline-flex" : "none";
     }
+    const mobileAdminBtn = document.getElementById("mobile-nav-admin");
+    if (mobileAdminBtn) {
+        mobileAdminBtn.style.display = currentUser.is_admin ? "flex" : "none";
+    }
+    document.querySelectorAll(".mobile-nav-btn[data-screen]").forEach(btn => {
+        const mod = btn.getAttribute("data-screen");
+        if (mod && mod !== "usuarios") {
+            btn.style.display = usuarioTemPermissao(mod) ? "flex" : "none";
+        }
+    });
     if (avatarEl) {
         const parts = (currentUser.nome_completo || "OP").trim().split(" ");
         avatarEl.innerText = parts.length > 1

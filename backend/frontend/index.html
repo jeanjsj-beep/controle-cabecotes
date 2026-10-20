@@ -2,10 +2,13 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>SCRC - Sistema de Recondicionamento de Cabeçotes</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/style.css?v=4.0">
+    <link rel="stylesheet" href="/style.css?v=5.0">
 </head>
 <body class="dark-theme">
     <!-- TELA DE LOGIN INTERATIVA E SEGURA -->
@@ -51,14 +54,18 @@
     </div>
 
     <div class="app-container" id="main-app-container" style="display: none;">
+        <!-- Backdrop Mobile para fechar o menu lateral ao tocar fora -->
+        <div id="mobile-sidebar-backdrop" class="mobile-sidebar-backdrop" onclick="closeMobileSidebar()"></div>
+
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="app-sidebar">
             <div class="brand">
                 <span class="brand-icon">⚙️</span>
                 <div class="brand-text">
                     <h1>SCRC</h1>
                     <span>Fluxo de Cabeçotes</span>
                 </div>
+                <button type="button" class="mobile-sidebar-close" onclick="closeMobileSidebar()" aria-label="Fechar Menu">&times;</button>
             </div>
             
             <nav class="nav-menu">
@@ -129,12 +136,17 @@
         <!-- Main Content Area -->
         <main class="main-content">
             <header class="top-bar">
-                <div class="page-title-wrap">
-                    <h2 id="current-page-title">📊 Dashboard Geral</h2>
-                    <span id="current-page-subtitle">Acompanhamento em tempo real da eficiência do fluxo fabril</span>
+                <div class="top-bar-left">
+                    <button type="button" class="mobile-menu-btn" id="btn-mobile-menu" onclick="toggleMobileSidebar()" aria-label="Abrir Menu">
+                        <span>☰</span>
+                    </button>
+                    <div class="page-title-wrap">
+                        <h2 id="current-page-title">📊 Dashboard Geral</h2>
+                        <span id="current-page-subtitle">Acompanhamento em tempo real da eficiência do fluxo fabril</span>
+                    </div>
                 </div>
                 <div class="user-profile">
-                    <button class="btn btn-primary btn-sm" id="btn-top-admin-panel" onclick="navigate('usuarios')" title="Abrir Painel Administrativo de Usuários, Cadastros e Controle de Acesso" style="display: none;">🛡️ Painel Admin & Acessos</button>
+                    <button class="btn btn-primary btn-sm" id="btn-top-admin-panel" onclick="navigate('usuarios')" title="Abrir Painel Administrativo de Usuários, Cadastros e Controle de Acesso" style="display: none;">🛡️ <span class="btn-label-text">Painel Admin & Acessos</span></button>
                     <div class="logged-user-card">
                         <div class="avatar" id="logged-user-avatar">AD</div>
                         <div class="logged-user-info">
@@ -142,8 +154,8 @@
                             <span id="logged-user-badge" class="badge badge-info" style="font-size:0.68rem; padding:2px 8px;">ADMIN</span>
                         </div>
                     </div>
-                    <button class="btn btn-secondary btn-sm" onclick="abrirAlterarSenhaModal()" title="Alterar Minha Senha">🔑 Senha</button>
-                    <button class="btn btn-danger btn-sm" onclick="handleLogout()" title="Encerrar Sessão com Segurança">🚪 Sair</button>
+                    <button class="btn btn-secondary btn-sm" onclick="abrirAlterarSenhaModal()" title="Alterar Minha Senha">🔑 <span class="btn-label-text">Senha</span></button>
+                    <button class="btn btn-danger btn-sm" onclick="handleLogout()" title="Encerrar Sessão com Segurança">🚪 <span class="btn-label-text">Sair</span></button>
                 </div>
             </header>
 
@@ -1351,6 +1363,34 @@
                 </div>
             </section>
         </main>
+
+        <!-- Barra de Navegação Inferior Rápida (Exclusiva Mobile) -->
+        <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+            <button type="button" class="mobile-nav-btn active" data-screen="dashboard" onclick="navigate('dashboard')">
+                <span class="mobile-nav-icon">📊</span>
+                <span>Painel</span>
+            </button>
+            <button type="button" class="mobile-nav-btn" data-screen="entrada" onclick="navigate('entrada')">
+                <span class="mobile-nav-icon">📥</span>
+                <span>Entrada</span>
+            </button>
+            <button type="button" class="mobile-nav-btn" data-screen="recebimento" onclick="navigate('recebimento')">
+                <span class="mobile-nav-icon">📋</span>
+                <span>Triagem</span>
+            </button>
+            <button type="button" class="mobile-nav-btn" data-screen="relatorios" onclick="navigate('relatorios')">
+                <span class="mobile-nav-icon">📄</span>
+                <span>Laudos</span>
+            </button>
+            <button type="button" class="mobile-nav-btn" id="mobile-nav-admin" data-screen="usuarios" onclick="navigate('usuarios')" style="display:none;">
+                <span class="mobile-nav-icon">🛡️</span>
+                <span>Admin</span>
+            </button>
+            <button type="button" class="mobile-nav-btn" onclick="toggleMobileSidebar()">
+                <span class="mobile-nav-icon">☰</span>
+                <span>Etapas</span>
+            </button>
+        </nav>
     </div>
 
     <!-- MODAL DETALHADO DE SALA/POSTO -->
@@ -1464,6 +1504,6 @@
     <!-- Notification Toast -->
     <div id="toast-wrap" class="toast-wrap"></div>
 
-    <script src="/app.js?v=4.0"></script>
+    <script src="/app.js?v=5.0"></script>
 </body>
 </html>
