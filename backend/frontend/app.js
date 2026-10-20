@@ -4,7 +4,7 @@ let currentCabecoteId = null;
 let currentLoteId = null;
 
 // Variáveis Globais de Sessão e Autenticação
-let authToken = sessionStorage.getItem("scrc_auth_token") || null;
+let authToken = localStorage.getItem("scrc_auth_token") || sessionStorage.getItem("scrc_auth_token") || null;
 let currentUser = null;
 
 // Interceptador Global de Fetch para anexar Token Bearer e tratar 401/403 automaticamente
@@ -1980,6 +1980,7 @@ async function verificarSessaoInicial() {
 function exibirTelaLogin(mensagemErro = null) {
     authToken = null;
     currentUser = null;
+    localStorage.removeItem("scrc_auth_token");
     sessionStorage.removeItem("scrc_auth_token");
     if (refreshTimer) clearInterval(refreshTimer);
 
@@ -2039,6 +2040,7 @@ async function handleLoginSubmit(event) {
         if (res.ok) {
             authToken = data.access_token;
             currentUser = data.usuario;
+            localStorage.setItem("scrc_auth_token", authToken);
             sessionStorage.setItem("scrc_auth_token", authToken);
             passwordInput.value = "";
             errBox.classList.add("hidden");
@@ -2071,11 +2073,15 @@ function aplicarSessaoAutenticada() {
     const badgeEl = document.getElementById("logged-user-badge");
     const avatarEl = document.getElementById("logged-user-avatar");
     const roleFooter = document.getElementById("sidebar-user-role");
+    const topAdminBtn = document.getElementById("btn-top-admin-panel");
 
     if (nameEl) nameEl.innerText = currentUser.nome_completo;
     if (badgeEl) {
         badgeEl.innerText = currentUser.is_admin ? "👑 ADMIN" : `👤 ${currentUser.cargo || "OPERADOR"}`;
         badgeEl.className = currentUser.is_admin ? "badge badge-warning" : "badge badge-info";
+    }
+    if (topAdminBtn) {
+        topAdminBtn.style.display = currentUser.is_admin ? "inline-flex" : "none";
     }
     if (avatarEl) {
         const parts = (currentUser.nome_completo || "OP").trim().split(" ");
@@ -2254,6 +2260,21 @@ async function loadUsuariosScreen() {
         const res = await fetch(`${API_BASE}/usuarios`);
         const usuarios = await res.json();
         tbody.innerHTML = "";
+
+        const agora = new Date();
+        const totalUsers = usuarios.length;
+        const totalAdmins = usuarios.filter(u => u.is_admin).length;
+        const totalComuns = usuarios.filter(u => !u.is_admin).length;
+        const totalBloqueados = usuarios.filter(u => !u.ativo || (u.bloqueado_ate && new Date(u.bloqueado_ate + "Z") > agora)).length;
+
+        const elTotal = document.getElementById("admin-kpi-total");
+        const elAdmins = document.getElementById("admin-kpi-admins");
+        const elComuns = document.getElementById("admin-kpi-comuns");
+        const elBloq = document.getElementById("admin-kpi-bloqueados");
+        if (elTotal) elTotal.innerText = totalUsers;
+        if (elAdmins) elAdmins.innerText = totalAdmins;
+        if (elComuns) elComuns.innerText = totalComuns;
+        if (elBloq) elBloq.innerText = totalBloqueados;
 
         usuarios.forEach(u => {
             const tr = document.createElement("tr");

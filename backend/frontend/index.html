@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SCRC - Sistema de Recondicionamento de Cabeçotes</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/style.css?v=3.0">
+    <link rel="stylesheet" href="/style.css?v=4.0">
 </head>
 <body class="dark-theme">
     <!-- TELA DE LOGIN INTERATIVA E SEGURA -->
@@ -62,55 +62,58 @@
             </div>
             
             <nav class="nav-menu">
-                <a href="#" class="nav-item active" onclick="navigate('dashboard')">
+                <a href="javascript:void(0)" class="nav-item active" onclick="navigate('dashboard')">
                     <span class="nav-icon">📊</span> Dashboard Geral
                 </a>
-                <a href="#" class="nav-item" onclick="navigate('entrada')">
+                <a href="javascript:void(0)" class="nav-item" id="nav-usuarios-top" onclick="navigate('usuarios')" style="border: 1px solid rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.08); color: #38bdf8;">
+                    <span class="nav-icon">🛡️</span> Painel Admin & Acessos
+                </a>
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('entrada')">
                     <span class="nav-icon">📥</span> 1. Entrada de Lote
                 </a>
-                <a href="#" class="nav-item" onclick="navigate('recebimento')">
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('recebimento')">
                     <span class="nav-icon">📋</span> Fila & Triagem
                 </a>
                 
                 <div class="nav-section">OFICINA</div>
-                <a href="#" class="nav-item" onclick="navigate('lavagem')">
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('lavagem')">
                     <span class="nav-icon">🧼</span> Lavagem
                 </a>
-                <a href="#" class="nav-item" onclick="navigate('jateamento')">
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('jateamento')">
                     <span class="nav-icon">💨</span> Jateamento
                 </a>
-                <a href="#" class="nav-item" onclick="navigate('estanqueidade')">
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('estanqueidade')">
                     <span class="nav-icon">💧</span> Estanqueidade
                 </a>
-                <a href="#" class="nav-item" onclick="navigate('faceamento')">
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('faceamento')">
                     <span class="nav-icon">📐</span> Faceamento
                 </a>
-                <a href="#" class="nav-item" id="nav-lapidacao" onclick="navigate('lapidacao')">
+                <a href="javascript:void(0)" class="nav-item" id="nav-lapidacao" onclick="navigate('lapidacao')">
                     <span class="nav-icon">💎</span> Lapidação
                 </a>
-                <a href="#" class="nav-item" onclick="navigate('montagem')">
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('montagem')">
                     <span class="nav-icon">🔧</span> Montagem
                 </a>
-                <a href="#" class="nav-item" onclick="navigate('qualidade')">
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('qualidade')">
                     <span class="nav-icon">🛡️</span> Qualidade
                 </a>
-                <a href="#" class="nav-item" onclick="navigate('pintura')">
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('pintura')">
                     <span class="nav-icon">🎨</span> Pintura
                 </a>
                 
                 <div class="nav-section">SAÍDA & LAUDOS</div>
-                <a href="#" class="nav-item" onclick="navigate('expedicao')">
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('expedicao')">
                     <span class="nav-icon">🚚</span> Expedição & Saída
                 </a>
-                <a href="#" class="nav-item" onclick="navigate('relatorios')">
+                <a href="javascript:void(0)" class="nav-item" onclick="navigate('relatorios')">
                     <span class="nav-icon">📄</span> Relatórios (PDF)
                 </a>
 
                 <div class="nav-section" id="nav-section-ajustes">AJUSTES & SEGURANÇA</div>
-                <a href="#" class="nav-item" id="nav-usuarios" onclick="navigate('usuarios')">
+                <a href="javascript:void(0)" class="nav-item" id="nav-usuarios" onclick="navigate('usuarios')">
                     <span class="nav-icon">👥</span> Usuários & Permissões
                 </a>
-                <a href="#" class="nav-item" id="nav-configuracoes" onclick="navigate('configuracoes')">
+                <a href="javascript:void(0)" class="nav-item" id="nav-configuracoes" onclick="navigate('configuracoes')">
                     <span class="nav-icon">⚙️</span> Configurações
                 </a>
             </nav>
@@ -131,6 +134,7 @@
                     <span id="current-page-subtitle">Acompanhamento em tempo real da eficiência do fluxo fabril</span>
                 </div>
                 <div class="user-profile">
+                    <button class="btn btn-primary btn-sm" id="btn-top-admin-panel" onclick="navigate('usuarios')" title="Abrir Painel Administrativo de Usuários, Cadastros e Controle de Acesso" style="display: none;">🛡️ Painel Admin & Acessos</button>
                     <div class="logged-user-card">
                         <div class="avatar" id="logged-user-avatar">AD</div>
                         <div class="logged-user-info">
@@ -1174,13 +1178,53 @@
 
             <!-- Screen: Gestão de Usuários e Permissões (Exclusivo Admin) -->
             <section id="screen-usuarios" class="screen">
+                <!-- KPIs do Painel Administrativo -->
+                <div class="kpi-grid" style="margin-bottom: 20px;">
+                    <div class="kpi-card glass">
+                        <div class="kpi-header">
+                            <span>Total de Usuários</span>
+                            <span class="kpi-icon">👥</span>
+                        </div>
+                        <div class="kpi-value" id="admin-kpi-total">1</div>
+                        <div class="kpi-footer">Contas cadastradas no sistema</div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-header">
+                            <span>Administradores</span>
+                            <span class="kpi-icon">👑</span>
+                        </div>
+                        <div class="kpi-value" id="admin-kpi-admins">1</div>
+                        <div class="kpi-footer">Acesso total irrestrito</div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-header">
+                            <span>Operadores & Equipe</span>
+                            <span class="kpi-icon">🔧</span>
+                        </div>
+                        <div class="kpi-value" id="admin-kpi-comuns">0</div>
+                        <div class="kpi-footer">Com permissões por setor/etapa</div>
+                    </div>
+                    <div class="kpi-card glass">
+                        <div class="kpi-header">
+                            <span>Bloqueados / Inativos</span>
+                            <span class="kpi-icon">🔒</span>
+                        </div>
+                        <div class="kpi-value" id="admin-kpi-bloqueados">0</div>
+                        <div class="kpi-footer">Proteção anti-força bruta ativa</div>
+                    </div>
+                </div>
+
                 <div class="panel glass">
                     <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                         <div>
-                            <h3>👥 Gestão de Usuários e Controle de Permissões (RBAC)</h3>
-                            <span>Cadastre operadores, defina permissões granulares por módulo/etapa e monitore a segurança das contas</span>
+                            <h3>🛡️ Painel Administrativo: Cadastros de Usuários & Controle de Acesso (RBAC)</h3>
+                            <span>Crie logins para operadores, defina quais telas/etapas cada colaborador pode acessar e gerencie senhas e bloqueios</span>
                         </div>
-                        <button class="btn btn-primary" onclick="abrirModalUsuario()">➕ Novo Usuário</button>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <button class="btn btn-secondary" onclick="navigate('entrada')">📥 Cadastrar Cliente / Lote</button>
+                            <button class="btn btn-secondary" onclick="navigate('configuracoes')">⚙️ Módulos da Oficina</button>
+                            <button class="btn btn-primary" onclick="abrirModalUsuario()">➕ Cadastrar Novo Usuário</button>
+                        </div>
                     </div>
                     <div class="panel-body">
                         <div class="table-responsive">
@@ -1190,10 +1234,10 @@
                                         <th>Login</th>
                                         <th>Nome Completo / Cargo</th>
                                         <th>Perfil</th>
-                                        <th>Permissões de Acesso</th>
+                                        <th>Permissões de Acesso (Módulos Liberados)</th>
                                         <th>Status / Segurança</th>
                                         <th>Último Acesso</th>
-                                        <th>Ações</th>
+                                        <th>Ações Administrativas</th>
                                     </tr>
                                 </thead>
                                 <tbody id="usuarios-table-body"></tbody>
@@ -1420,6 +1464,6 @@
     <!-- Notification Toast -->
     <div id="toast-wrap" class="toast-wrap"></div>
 
-    <script src="/app.js?v=3.0"></script>
+    <script src="/app.js?v=4.0"></script>
 </body>
 </html>

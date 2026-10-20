@@ -44,23 +44,25 @@ body {
     border-right: 1px solid var(--border-glass);
     display: flex;
     flex-direction: column;
-    padding: 24px 16px;
+    padding: 16px 14px;
     height: 100vh;
     position: sticky;
     top: 0;
+    overflow: hidden;
 }
 
 .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding-bottom: 24px;
+    gap: 10px;
+    padding-bottom: 14px;
     border-bottom: 1px solid var(--border-glass);
-    margin-bottom: 24px;
+    margin-bottom: 10px;
+    flex-shrink: 0;
 }
 
 .brand-icon {
-    font-size: 2rem;
+    font-size: 1.75rem;
     animation: rotateGear 15s linear infinite;
 }
 
@@ -70,44 +72,50 @@ body {
 }
 
 .brand-text h1 {
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     font-weight: 700;
     letter-spacing: 0.5px;
     color: var(--primary);
 }
 
 .brand-text span {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--text-muted);
 }
 
 .nav-menu {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    flex-grow: 1;
+    gap: 3px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+    scrollbar-width: thin;
 }
 
 .nav-section {
-    font-size: 0.7rem;
+    font-size: 0.66rem;
     font-weight: 700;
     color: var(--text-muted);
     letter-spacing: 1px;
-    margin: 16px 0 8px 8px;
+    margin: 10px 0 4px 8px;
     text-transform: uppercase;
+    flex-shrink: 0;
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
+    gap: 10px;
+    padding: 7px 10px;
     color: var(--text-muted);
     text-decoration: none;
     border-radius: 8px;
-    font-size: 0.9rem;
+    font-size: 0.84rem;
     font-weight: 500;
     transition: var(--transition);
+    flex-shrink: 0;
 }
 
 .nav-item:hover, .nav-item.active {

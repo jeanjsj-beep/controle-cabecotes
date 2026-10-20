@@ -38,7 +38,8 @@ TODOS_MODULOS_PERMISSOES = [
 PBKDF2_ITERATIONS = 200_000
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_MINUTES = 5
-SESSION_DURATION_HOURS = 8
+SESSION_DURATION_HOURS = 24
+TOKEN_SIGNING_SECRET = "scrc-hmac-sha256-session-key-2026-v3"
 
 # Rate limiter em memória por IP para mitigar ataques de força bruta distribuídos
 _IP_ATTEMPTS: dict[str, list[datetime.datetime]] = {}
@@ -83,6 +84,42 @@ def verificar_senha(password: str, hash_armazenado: str, salt_hex: str) -> bool:
 def hash_token_sessao(raw_token: str) -> str:
     """Armazena apenas o hash SHA-256 do token de sessão no banco de dados."""
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def gerar_token_sessao_assinado(usuario: models.Usuario, expira_em: datetime.datetime) -> str:
+    """Gera um token Bearer assinado via HMAC-SHA256 (suporta múltiplas abas/dispositivos simultâneos
+    sem desconectar sessões ativas e invalida automaticamente se a senha ou status mudar)."""
+    exp_ts = int(expira_em.replace(tzinfo=datetime.timezone.utc).timestamp())
+    nonce = secrets.token_hex(8)
+    payload = f"s1.{usuario.id}.{exp_ts}.{nonce}"
+    chave = f"{TOKEN_SIGNING_SECRET}:{usuario.senha_salt}:{usuario.senha_hash[:24]}".encode("utf-8")
+    assinatura = hmac.new(chave, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload}.{assinatura}"
+
+
+def validar_token_sessao_assinado(raw_token: str, db: Session) -> Optional[models.Usuario]:
+    """Valida token HMAC-SHA256 em tempo constante."""
+    try:
+        partes = raw_token.split(".")
+        if len(partes) != 5 or partes[0] != "s1":
+            return None
+        _, uid_str, exp_str, nonce, assinatura_recebida = partes
+        uid = int(uid_str)
+        exp_ts = int(exp_str)
+        agora_ts = int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+        if exp_ts < agora_ts:
+            return None
+        usuario = db.query(models.Usuario).filter(models.Usuario.id == uid).first()
+        if not usuario:
+            return None
+        payload = f"s1.{uid}.{exp_ts}.{nonce}"
+        chave = f"{TOKEN_SIGNING_SECRET}:{usuario.senha_salt}:{usuario.senha_hash[:24]}".encode("utf-8")
+        assinatura_esperada = hmac.new(chave, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(assinatura_recebida, assinatura_esperada):
+            return None
+        return usuario
+    except Exception:
+        return None
 
 
 def validar_username(username: str) -> str:
@@ -171,6 +208,22 @@ def obter_usuario_atual(
             detail="Token de acesso ausente ou inválido."
         )
 
+    # 1. Validar token assinado HMAC-SHA256 (multi-aba / Serverless)
+    if raw_token.startswith("s1."):
+        usuario = validar_token_sessao_assinado(raw_token, db)
+        if not usuario:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Sessão inválida ou expirada. Faça login novamente."
+            )
+        if not usuario.ativo:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Sua conta de usuário está desativada. Contate o Administrador."
+            )
+        return usuario
+
+    # 2. Fallback para tokens legados salvos em banco
     token_hash = hash_token_sessao(raw_token)
     usuario = db.query(models.Usuario).filter(models.Usuario.token_sessao == token_hash).first()
 
@@ -289,9 +342,9 @@ def login(dados: schemas.LoginInput, request: Request, db: Session = Depends(get
             detail=f"Usuário ou senha inválidos. ({restantes} tentativa(s) restante(s) antes do bloqueio de segurança)."
         )
 
-    # Login bem-sucedido: limpa contador de falhas e gera token criptográfico de sessão
-    raw_token = secrets.token_urlsafe(48)
+    # Login bem-sucedido: limpa contador de falhas e gera token criptográfico assinado (HMAC-SHA256)
     expira_em = agora + datetime.timedelta(hours=SESSION_DURATION_HOURS)
+    raw_token = gerar_token_sessao_assinado(usuario, expira_em)
 
     usuario.tentativas_falhas = 0
     usuario.bloqueado_ate = None
