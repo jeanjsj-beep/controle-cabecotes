@@ -18,19 +18,17 @@ if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
 try:
-    import app as _app_pkg  # noqa: F401
+    from .database import engine, Base, get_db, check_and_migrate_db, SessionLocal, IS_SQLITE
+    from . import models, schemas
+    from .routers import lotes, cabecotes, etapas, dashboard, clientes, auth
+    from .routers.etapas import construir_e_salvar_relatorio
+    from .routers.auth import obter_usuario_atual, requer_admin, garantir_admin_padrao, gerar_hash_senha
 except ImportError:
-    import types
-    _app_pkg = types.ModuleType("app")
-    _app_pkg.__path__ = [_THIS_DIR]
-    _app_pkg.__package__ = "app"
-    sys.modules["app"] = _app_pkg
-
-from app.database import engine, Base, get_db, check_and_migrate_db, SessionLocal
-from app import models, schemas
-from app.routers import lotes, cabecotes, etapas, dashboard, clientes, auth
-from app.routers.etapas import construir_e_salvar_relatorio
-from app.routers.auth import obter_usuario_atual, requer_admin, garantir_admin_padrao, gerar_hash_senha
+    from database import engine, Base, get_db, check_and_migrate_db, SessionLocal, IS_SQLITE
+    import models, schemas
+    from routers import lotes, cabecotes, etapas, dashboard, clientes, auth
+    from routers.etapas import construir_e_salvar_relatorio
+    from routers.auth import obter_usuario_atual, requer_admin, garantir_admin_padrao, gerar_hash_senha
 
 # Inicializar e Migrar Tabelas de forma segura (sem derrubar o cold-start Serverless)
 _DB_INITIALIZED = False
@@ -48,7 +46,8 @@ def init_db_safe():
     except Exception as e:
         print(f"Aviso na inicialização do banco: {e}")
 
-init_db_safe()
+if IS_SQLITE:
+    init_db_safe()
 
 app = FastAPI(
     title="Sistema de Controle de Recondicionamento de Cabeçotes (SCRC)",

@@ -1,7 +1,12 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, Text
 from sqlalchemy.orm import relationship
 import datetime
-from .database import Base
+import sys
+
+try:
+    from .database import Base
+except ImportError:
+    from database import Base
 
 class Cliente(Base):
     __tablename__ = "clientes"
@@ -186,5 +191,9 @@ class FotoArmazenada(Base):
     mime_type = Column(String, nullable=False, default="image/jpeg")
     content_base64 = Column(Text, nullable=False)
     criado_em = Column(DateTime, default=datetime.datetime.utcnow)
+
+sys.modules.setdefault("models", sys.modules[__name__])
+sys.modules.setdefault("app.models", sys.modules[__name__])
+
 
 

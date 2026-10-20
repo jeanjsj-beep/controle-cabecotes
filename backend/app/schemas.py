@@ -286,3 +286,8 @@ class LoginResponse(BaseModel):
     expira_em: datetime
     usuario: UsuarioResponse
 
+import sys as _sys
+_sys.modules.setdefault("schemas", _sys.modules[__name__])
+_sys.modules.setdefault("app.schemas", _sys.modules[__name__])
+
+

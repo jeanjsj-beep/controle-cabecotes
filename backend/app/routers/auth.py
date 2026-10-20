@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from ..database import get_db
-from .. import models, schemas
+try:
+    from ..database import get_db
+    from .. import models, schemas
+except ImportError:
+    from database import get_db
+    import models, schemas
 import datetime
 import hashlib
 import hmac

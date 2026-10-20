@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
-from ..database import get_db
-from .. import models, schemas
+try:
+    from ..database import get_db
+    from .. import models, schemas
+except ImportError:
+    from database import get_db
+    import models, schemas
 from .etapas import construir_e_salvar_relatorio
 from .auth import obter_usuario_atual, requer_permissao
 import json

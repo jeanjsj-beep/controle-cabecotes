@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from ..database import get_db
-from .. import models
+try:
+    from ..database import get_db
+    from .. import models
+except ImportError:
+    from database import get_db
+    import models
 from .auth import obter_usuario_atual
 import datetime
 

@@ -2,8 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 import re
-from ..database import get_db
-from .. import models, schemas
+try:
+    from ..database import get_db
+    from .. import models, schemas
+except ImportError:
+    from database import get_db
+    import models, schemas
 from .auth import obter_usuario_atual
 
 router = APIRouter(prefix="/api/clientes", tags=["Clientes"], dependencies=[Depends(obter_usuario_atual)])
