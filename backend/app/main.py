@@ -8,6 +8,13 @@ import base64
 import uuid
 import re
 import json
+import traceback
+
+app = FastAPI(
+    title="Sistema de Controle de Recondicionamento de Cabeçotes (SCRC)",
+    description="Backend para gerenciamento do fluxo fabril de cabeçotes de motor.",
+    version="2.0.0"
+)
 
 # Garantir que o pacote 'app' funcione em qualquer Root Directory da Vercel ('./', 'backend' ou 'backend/app')
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -18,24 +25,38 @@ if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
 try:
-    from .database import engine, Base, get_db, check_and_migrate_db, SessionLocal, IS_SQLITE
-    from . import models, schemas
-    from .routers import lotes, cabecotes, etapas, dashboard, clientes, auth
-    from .routers.etapas import construir_e_salvar_relatorio
-    from .routers.auth import obter_usuario_atual, requer_admin, garantir_admin_padrao, gerar_hash_senha
+    import app as _app_pkg  # noqa: F401
 except ImportError:
-    from database import engine, Base, get_db, check_and_migrate_db, SessionLocal, IS_SQLITE
-    import models, schemas
-    from routers import lotes, cabecotes, etapas, dashboard, clientes, auth
-    from routers.etapas import construir_e_salvar_relatorio
-    from routers.auth import obter_usuario_atual, requer_admin, garantir_admin_padrao, gerar_hash_senha
+    import types
+    _app_pkg = types.ModuleType("app")
+    _app_pkg.__path__ = [_THIS_DIR]
+    _app_pkg.__package__ = "app"
+    sys.modules["app"] = _app_pkg
 
-# Inicializar e Migrar Tabelas de forma segura (sem derrubar o cold-start Serverless)
+_BOOT_ERROR = None
 _DB_INITIALIZED = False
+
+try:
+    from app.database import engine, Base, get_db, check_and_migrate_db, SessionLocal, IS_SQLITE
+    from app import models, schemas
+    from app.routers import lotes, cabecotes, etapas, dashboard, clientes, auth
+    from app.routers.etapas import construir_e_salvar_relatorio
+    from app.routers.auth import obter_usuario_atual, requer_admin, garantir_admin_padrao, gerar_hash_senha
+except Exception:
+    _BOOT_ERROR = traceback.format_exc()
+    IS_SQLITE = False
+    def get_db(): yield None
+    def obter_usuario_atual(): return None
+    def requer_admin(): return None
+    class _Dummy:
+        FotoUploadInput = dict
+        Usuario = object
+    schemas = _Dummy()
+    models = _Dummy()
 
 def init_db_safe():
     global _DB_INITIALIZED
-    if _DB_INITIALIZED:
+    if _DB_INITIALIZED or _BOOT_ERROR:
         return
     try:
         Base.metadata.create_all(bind=engine)
@@ -46,14 +67,8 @@ def init_db_safe():
     except Exception as e:
         print(f"Aviso na inicialização do banco: {e}")
 
-if IS_SQLITE:
+if not _BOOT_ERROR and IS_SQLITE:
     init_db_safe()
-
-app = FastAPI(
-    title="Sistema de Controle de Recondicionamento de Cabeçotes (SCRC)",
-    description="Backend para gerenciamento do fluxo fabril de cabeçotes de motor.",
-    version="2.0.0"
-)
 
 # Middleware de Cabeçalhos de Segurança HTTP
 @app.middleware("http")
@@ -75,12 +90,13 @@ app.add_middleware(
 )
 
 # Registrar Routers
-app.include_router(auth.router)
-app.include_router(clientes.router)
-app.include_router(lotes.router)
-app.include_router(cabecotes.router)
-app.include_router(etapas.router)
-app.include_router(dashboard.router)
+if not _BOOT_ERROR:
+    app.include_router(auth.router)
+    app.include_router(clientes.router)
+    app.include_router(lotes.router)
+    app.include_router(cabecotes.router)
+    app.include_router(etapas.router)
+    app.include_router(dashboard.router)
 
 # Diretórios de Frontend e Uploads (compatível com Root Directory './', 'backend' ou 'backend/app' na Vercel)
 _CANDIDATE_FRONTENDS = [
@@ -100,7 +116,12 @@ except Exception:
 @app.get("/api/health")
 def health_check():
     init_db_safe()
-    return {"status": "ok", "frontend_dir_exists": os.path.exists(FRONTEND_DIR), "db_initialized": _DB_INITIALIZED}
+    return {
+        "status": "error" if _BOOT_ERROR else "ok",
+        "boot_error": _BOOT_ERROR,
+        "frontend_dir_exists": os.path.exists(FRONTEND_DIR),
+        "db_initialized": _DB_INITIALIZED
+    }
 
 
 @app.post("/api/upload")
