@@ -4,31 +4,61 @@ from sqlalchemy.orm import sessionmaker
 import os
 import sys
 
-# URL do PostgreSQL no Supabase (Pooler IPv4 compatível com Rede Local e Vercel Serverless)
-DEFAULT_SUPABASE_URL = "postgresql://postgres.hmjspzoabaiqtrkswgco:Lidertech%401995@aws-1-ca-central-1.pooler.supabase.com:6543/postgres"
+# URL oficial do PostgreSQL no Supabase (Pooler IPv4 compatível com Rede Local e Vercel Serverless)
+DEFAULT_SUPABASE_URL = "postgresql+pg8000://postgres.hmjspzoabaiqtrkswgco:Lidertech%401995@aws-1-ca-central-1.pooler.supabase.com:6543/postgres"
 
-RAW_DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_SUPABASE_URL).strip()
+RAW_DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 
-# Normalizar prefixo e usar pg8000 (driver puro Python sem dependência binária C na Vercel)
-if RAW_DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = RAW_DATABASE_URL.replace("postgres://", "postgresql://", 1)
-else:
-    DATABASE_URL = RAW_DATABASE_URL
 
+def resolver_database_url(raw_url: str) -> str:
+    """Normaliza e corrige automaticamente URLs do Supabase (incluindo senhas com '@' sem encode
+    ou host direto IPv6 db.hmjspzoabaiqtrkswgco.supabase.co incompatível com Vercel IPv4)."""
+    if not raw_url:
+        return DEFAULT_SUPABASE_URL
+
+    # Se for SQLite local explícito
+    if raw_url.startswith("sqlite"):
+        return raw_url
+
+    # Se apontar para o projeto Supabase do usuário (mesmo com host direto IPv6 ou '@' não escapado na senha)
+    if (
+        "hmjspzoabaiqtrkswgco" in raw_url
+        or "[YOUR-PASSWORD]" in raw_url
+        or "Lidertech@1995@" in raw_url
+    ):
+        return DEFAULT_SUPABASE_URL
+
+    url = raw_url
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+
+    if url.startswith("postgresql://"):
+        try:
+            import pg8000  # noqa: F401
+            url = url.replace("postgresql://", "postgresql+pg8000://", 1)
+        except ImportError:
+            pass
+
+    return url
+
+
+DATABASE_URL = resolver_database_url(RAW_DATABASE_URL)
 IS_SQLITE = DATABASE_URL.startswith("sqlite")
 
-if not IS_SQLITE and DATABASE_URL.startswith("postgresql://"):
-    try:
-        import pg8000  # noqa: F401
-        DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+pg8000://", 1)
-    except ImportError:
-        pass
-
-if IS_SQLITE:
-    engine = create_engine(
-        DATABASE_URL, connect_args={"check_same_thread": False}
-    )
-else:
+try:
+    if IS_SQLITE:
+        engine = create_engine(
+            DATABASE_URL, connect_args={"check_same_thread": False}
+        )
+    else:
+        engine = create_engine(
+            DATABASE_URL,
+            pool_pre_ping=True,
+            pool_recycle=300
+        )
+except Exception:
+    DATABASE_URL = DEFAULT_SUPABASE_URL
+    IS_SQLITE = False
     engine = create_engine(
         DATABASE_URL,
         pool_pre_ping=True,
@@ -43,12 +73,14 @@ Base = declarative_base()
 sys.modules.setdefault("database", sys.modules[__name__])
 sys.modules.setdefault("app.database", sys.modules[__name__])
 
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
 
 def check_and_migrate_db():
     if not IS_SQLITE:
