@@ -2058,6 +2058,9 @@ async function handleLoginSubmit(event) {
 }
 
 function aplicarSessaoAutenticada() {
+    const oldSeedBtn = document.getElementById("btn-seed-demo");
+    if (oldSeedBtn) oldSeedBtn.remove();
+
     const overlay = document.getElementById("login-overlay");
     const mainApp = document.getElementById("main-app-container");
     if (overlay) overlay.style.display = "none";

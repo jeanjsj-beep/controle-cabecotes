@@ -219,11 +219,18 @@ def get_uploaded_file(filename: str, db: Session = Depends(get_db)):
     raise HTTPException(status_code=404, detail="Imagem não encontrada.")
 
 
+_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
 @app.get("/")
 def read_root():
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
-        return FileResponse(index_path)
+        return FileResponse(index_path, headers=_NO_CACHE_HEADERS)
     return {"message": "SCRC API Online. Frontend index.html não localizado.", "docs": "/docs"}
 
 
@@ -231,7 +238,7 @@ def read_root():
 def read_style():
     style_path = os.path.join(FRONTEND_DIR, "style.css")
     if os.path.exists(style_path):
-        return FileResponse(style_path, media_type="text/css")
+        return FileResponse(style_path, media_type="text/css", headers=_NO_CACHE_HEADERS)
     return {"error": "style.css não localizado."}
 
 
@@ -239,6 +246,6 @@ def read_style():
 def read_js():
     js_path = os.path.join(FRONTEND_DIR, "app.js")
     if os.path.exists(js_path):
-        return FileResponse(js_path, media_type="application/javascript")
+        return FileResponse(js_path, media_type="application/javascript", headers=_NO_CACHE_HEADERS)
     return {"error": "app.js não localizado."}
 
