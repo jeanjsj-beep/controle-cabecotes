@@ -80,13 +80,14 @@ def init_db_safe():
         check_and_migrate_db()
         with SessionLocal() as _init_db:
             garantir_admin_padrao(_init_db)
-            aplicar_rls_postgresql(_init_db)
+            if not IS_SQLITE:
+                aplicar_rls_postgresql(_init_db)
         _DB_INITIALIZED = True
     except Exception as e:
         print(f"Aviso na inicialização do banco: {e}")
 
 
-if not _BOOT_ERROR and IS_SQLITE:
+if not _BOOT_ERROR:
     init_db_safe()
 
 # --- ITEM 9: RATE LIMITING GLOBAL E DE UPLOAD POR IP ---
@@ -235,13 +236,16 @@ app.add_middleware(
 )
 
 # Registrar Routers
-if not _BOOT_ERROR:
+try:
     app.include_router(auth.router)
     app.include_router(clientes.router)
     app.include_router(lotes.router)
     app.include_router(cabecotes.router)
     app.include_router(etapas.router)
     app.include_router(dashboard.router)
+except Exception as e:
+    _BOOT_ERROR = traceback.format_exc()
+    print(f"Erro ao registrar routers: {e}")
 
 # Diretórios de Frontend e Uploads (compatível com Root Directory './', 'backend' ou 'backend/app' na Vercel)
 _CANDIDATE_FRONTENDS = [
@@ -263,7 +267,8 @@ def health_check():
     return {
         "status": "error" if _BOOT_ERROR else "ok",
         "frontend_dir_exists": os.path.exists(FRONTEND_DIR),
-        "db_initialized": _DB_INITIALIZED
+        "db_initialized": _DB_INITIALIZED,
+        "is_sqlite": IS_SQLITE
     }
 
 
