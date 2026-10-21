@@ -266,6 +266,7 @@ except Exception:
 def health_check():
     return {
         "status": "error" if _BOOT_ERROR else "ok",
+        "boot_error": str(_BOOT_ERROR) if _BOOT_ERROR else None,
         "frontend_dir_exists": os.path.exists(FRONTEND_DIR),
         "db_initialized": _DB_INITIALIZED,
         "is_sqlite": IS_SQLITE
