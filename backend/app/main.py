@@ -42,12 +42,32 @@ except ImportError:
 
 _BOOT_ERROR = None
 _DB_INITIALIZED = False
+_IMPORT_ERRORS = {}
 
 try:
     from app.database import engine, Base, get_db, check_and_migrate_db, SessionLocal, IS_SQLITE
+except Exception as e:
+    _IMPORT_ERRORS["database"] = traceback.format_exc()
+    engine = Base = get_db = check_and_migrate_db = SessionLocal = None
+    IS_SQLITE = False
+
+try:
     from app import models, schemas
+except Exception as e:
+    _IMPORT_ERRORS["models_schemas"] = traceback.format_exc()
+    class _Dummy:
+        FotoUploadInput = dict
+        Usuario = object
+    schemas = _Dummy()
+    models = _Dummy()
+
+try:
     from app.routers import lotes, cabecotes, etapas, dashboard, clientes, auth
-    from app.routers.etapas import construir_e_salvar_relatorio
+except Exception as e:
+    _IMPORT_ERRORS["routers"] = traceback.format_exc()
+    lotes = cabecotes = etapas = dashboard = clientes = auth = None
+
+try:
     from app.routers.auth import (
         obter_usuario_atual,
         requer_admin,
@@ -56,19 +76,16 @@ try:
         aplicar_rls_postgresql,
         registrar_evento_seguranca,
     )
-except Exception:
-    _BOOT_ERROR = traceback.format_exc()
-    IS_SQLITE = False
+except Exception as e:
+    _IMPORT_ERRORS["auth_funcs"] = traceback.format_exc()
     def get_db(): yield None
     def obter_usuario_atual(): return None
     def requer_admin(): return None
     def aplicar_rls_postgresql(_db): return {}
     def registrar_evento_seguranca(*_args, **_kwargs): pass
-    class _Dummy:
-        FotoUploadInput = dict
-        Usuario = object
-    schemas = _Dummy()
-    models = _Dummy()
+
+if _IMPORT_ERRORS:
+    _BOOT_ERROR = json.dumps(_IMPORT_ERRORS, indent=2)
 
 
 def init_db_safe():
@@ -237,15 +254,15 @@ app.add_middleware(
 
 # Registrar Routers
 try:
-    app.include_router(auth.router)
-    app.include_router(clientes.router)
-    app.include_router(lotes.router)
-    app.include_router(cabecotes.router)
-    app.include_router(etapas.router)
-    app.include_router(dashboard.router)
+    if auth: app.include_router(auth.router)
+    if clientes: app.include_router(clientes.router)
+    if lotes: app.include_router(lotes.router)
+    if cabecotes: app.include_router(cabecotes.router)
+    if etapas: app.include_router(etapas.router)
+    if dashboard: app.include_router(dashboard.router)
 except Exception as e:
-    _BOOT_ERROR = traceback.format_exc()
-    print(f"Erro ao registrar routers: {e}")
+    _IMPORT_ERRORS["include_router"] = traceback.format_exc()
+    _BOOT_ERROR = json.dumps(_IMPORT_ERRORS, indent=2)
 
 # Diretórios de Frontend e Uploads (compatível com Root Directory './', 'backend' ou 'backend/app' na Vercel)
 _CANDIDATE_FRONTENDS = [
