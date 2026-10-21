@@ -234,6 +234,20 @@ async def global_safe_exception_handler(request: Request, exc: Exception):
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
     trace_id = uuid.uuid4().hex[:10].upper()
     print(f"[ERRO INTERNO #{trace_id}] {request.method} {request.url.path}: {exc}")
+    try:
+        from app.database import SessionLocal
+        from app.routers.auth import registrar_evento_seguranca
+        with SessionLocal() as db:
+            registrar_evento_seguranca(
+                db,
+                evento=f"ERRO_500_{trace_id}",
+                severidade="CRITICAL",
+                usuario="sistema",
+                ip_origem=request.client.host if request.client else "0.0.0.0",
+                detalhes=f"{request.method} {request.url.path}: {str(exc)[:400]}"
+            )
+    except Exception:
+        pass
     return JSONResponse(
         status_code=500,
         content={

@@ -1,6 +1,7 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Any, Optional
 import re
 import json
 try:
@@ -54,23 +55,7 @@ def listar_clientes(usuario: models.Usuario = Depends(obter_usuario_atual), db: 
     return db.query(models.Cliente).order_by(models.Cliente.nome.asc()).all()
 
 
-@router.post("", response_model=schemas.ClienteResponse, status_code=status.HTTP_201_CREATED)
-def criar_cliente(
-    cliente_in: schemas.ClienteCreate,
-    usuario: models.Usuario = Depends(obter_usuario_atual),
-    db: Session = Depends(get_db)
-):
-    if not usuario.is_admin:
-        try:
-            perms = json.loads(usuario.permissoes_json or "[]")
-        except Exception:
-            perms = []
-        if "entrada" not in perms and "recebimento" not in perms:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acesso negado: permissão de Entrada ou Recebimento necessária para cadastrar clientes."
-            )
-
+def criar_cliente_db(cliente_in: schemas.ClienteCreate, db: Session) -> models.Cliente:
     cliente_existente = db.query(models.Cliente).filter(models.Cliente.nome == cliente_in.nome).first()
     if cliente_existente:
         return cliente_existente
@@ -94,3 +79,28 @@ def criar_cliente(
     db.commit()
     db.refresh(novo_cliente)
     return novo_cliente
+
+
+@router.post("", response_model=schemas.ClienteResponse, status_code=status.HTTP_201_CREATED)
+def criar_cliente(
+    cliente_in: schemas.ClienteCreate,
+    usuario_ou_db: Any = Depends(obter_usuario_atual),
+    db: Session = Depends(get_db)
+):
+    # Compatibilidade: se invocado diretamente em Python como criar_cliente(cliente_in, db)
+    if isinstance(usuario_ou_db, Session):
+        return criar_cliente_db(cliente_in, usuario_ou_db)
+
+    usuario: models.Usuario = usuario_ou_db
+    if usuario and not usuario.is_admin:
+        try:
+            perms = json.loads(usuario.permissoes_json or "[]")
+        except Exception:
+            perms = []
+        if "entrada" not in perms and "recebimento" not in perms:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso negado: permissão de Entrada ou Recebimento necessária para cadastrar clientes."
+            )
+
+    return criar_cliente_db(cliente_in, db)

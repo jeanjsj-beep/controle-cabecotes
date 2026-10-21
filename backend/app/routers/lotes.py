@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -7,7 +8,7 @@ try:
 except ImportError:
     from database import get_db
     import models, schemas
-from .clientes import criar_cliente
+from .clientes import criar_cliente, criar_cliente_db
 from .etapas import construir_e_salvar_relatorio
 from .auth import obter_usuario_atual, requer_permissao, requer_qualquer_permissao
 import datetime
@@ -29,7 +30,7 @@ def registrar_entrada_lote(dados: schemas.EntradaLoteInput, db: Session = Depend
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente selecionado não encontrado.")
     elif dados.novo_cliente:
-        cliente = criar_cliente(dados.novo_cliente, db)
+        cliente = criar_cliente_db(dados.novo_cliente, db)
     else:
         raise HTTPException(status_code=400, detail="É necessário selecionar um cliente existente ou cadastrar um novo cliente.")
 
