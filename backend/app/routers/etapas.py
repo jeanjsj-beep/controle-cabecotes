@@ -1,6 +1,7 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 try:
     from ..database import get_db
     from .. import models, schemas
